@@ -31,6 +31,7 @@ setA(Var,V,BooleanExp) when is_tuple(BooleanExp)  -> if % V is 0/1
                                                                   if element(2,BooleanExp) == Var -> {'or',V,setA(Var,V,element(3,BooleanExp))};
                                                                     element(3,BooleanExp) == Var -> {'or',setA(Var,V,element(2,BooleanExp)),V};
                                                                     true -> {'or',setA(Var,V,setA(Var,V,element(2,BooleanExp))),setA(Var,V,setA(Var,V,element(3,BooleanExp)))}
+                                                                  %^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ check this ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
                                                                   end;
                                                      true -> errorNotATuple
                                                     end;
@@ -41,62 +42,52 @@ reduceBool(BooleanExp) when not is_tuple(BooleanExp)-> BooleanExp;
 reduceBool(BooleanExp) when element(1, BooleanExp) == 'not'-> if  is_tuple(element(2,BooleanExp)) -> reduceBool({'not',reduceBool(element(2,BooleanExp))});
                                                                 element(2,BooleanExp) == 1 -> 0;
                                                                 element(2,BooleanExp) == 0 -> 1;
+                                                                %element 2 is a Variable so
                                                                 true -> BooleanExp
                                                               end;
 reduceBool(BooleanExp) when element(1, BooleanExp) == 'and'-> if (element(2,BooleanExp) == 0) or (element(3,BooleanExp) == 0)  -> 0;
                                                                 (element(2,BooleanExp) == 1) and (element(3,BooleanExp) == 1) -> 1;
                                                                 (element(2,BooleanExp) == 1) -> reduceBool(element(3,BooleanExp));
                                                                 (element(3,BooleanExp) == 1) -> reduceBool(element(2,BooleanExp));
-                                                                is_tuple(element(2,BooleanExp)) -> reduceBool({'and',reduceBool(element(2,BooleanExp)),element(3,BooleanExp)});
-                                                                is_tuple(element(3,BooleanExp)) ->  reduceBool({'and',element(2,BooleanExp),reduceBool(element(3,BooleanExp))});
+                                                                is_tuple(element(2,BooleanExp)) or is_tuple(element(3,BooleanExp)) -> reduceBool({'and',reduceBool(element(2,BooleanExp)),reduceBool(element(3,BooleanExp))});
                                                                 true -> BooleanExp
                                                               end;
 reduceBool(BooleanExp) when element(1, BooleanExp) == 'or'-> if (element(2,BooleanExp) == 1) or (element(3,BooleanExp) == 1)  -> 1;
                                                                 (element(2,BooleanExp) == 0) and (element(3,BooleanExp) == 0)  -> 0;
                                                                 (element(2,BooleanExp) == 0) -> reduceBool(element(3,BooleanExp));
                                                                 (element(3,BooleanExp) == 0) -> reduceBool(element(2,BooleanExp));
-                                                                is_tuple(element(2,BooleanExp)) -> reduceBool({'or',reduceBool(element(2,BooleanExp)),element(3,BooleanExp)});
-                                                                is_tuple(element(3,BooleanExp)) ->  reduceBool({'or',element(2,BooleanExp),reduceBool(element(3,BooleanExp))});
+                                                                is_tuple(element(2,BooleanExp)) or is_tuple(element(3,BooleanExp)) -> reduceBool({'or',reduceBool(element(2,BooleanExp)),reduceBool(element(3,BooleanExp))});
                                                                 true -> BooleanExp
                                                               end;
 reduceBool(_)-> error.
 %---------------------------------------------------------------------------------------------------------------------------------------------------
 %------------ returns List of the unique Variables
-getVars(BooleanExp) -> getVarsA(BooleanExp,[]).
+getVars(BooleanExp) ->  Set = sets:from_list(getVarsA (BooleanExp,[])), sets:to_list(Set). %removes duplications
 
+%gets all the Variables with duplicates
 getVarsA(BooleanExp,List) when not is_tuple(BooleanExp) -> List; %recursion base
 getVarsA(BooleanExp,List) when element(1, BooleanExp) == 'not' ->
-                    %-----check: if what come after not is tuple , if its alreadt in List
-                    case {is_tuple(element(2,BooleanExp)),lists:member(element(2,BooleanExp),List)} of
-                      {true,_}-> getVarsA(element(2,BooleanExp),List);
-                      {false,true} -> List;
-                      {false,false} -> List ++ element(2,BooleanExp)
+                    %-----check: if what come after not is tuple
+                    case {is_tuple(element(2,BooleanExp))} of
+                      {true}-> getVarsA(element(2,BooleanExp),List);
+                      {_} ->  [element(2,BooleanExp)] ++ List
                     end;
 getVarsA(BooleanExp,List) when (element(1, BooleanExp) == 'or') or (element(1, BooleanExp) == 'and') ->
                 %-----check: if what come after or/and is tuple , if its alreadt in List
                 %------------2-------------------------------3---------------------------------2-----------------------------------------3------------
-                    case {is_tuple(element(2,BooleanExp)),is_tuple(element(3,BooleanExp)),lists:member(element(2,BooleanExp),List),lists:member(element(3,BooleanExp),List)} of
+                    case {is_tuple(element(2,BooleanExp)),is_tuple(element(3,BooleanExp))} of
                       %------------one or two of the elements are tuples:------------------------------
                       %both elements are tuples
-                      {true,true,_,_}-> getVarsA(element(2,BooleanExp),List ++ getVarsA(element(3,BooleanExp),List));
-                      %it contains element 3 in list already
-                      {true,false,_,true}-> getVarsA(element(2,BooleanExp),List);
-                      %element 3 is new
-                      {true,false,_,false}-> getVarsA(element(2,BooleanExp),List ++ element(3,BooleanExp));
-                      %it contains element 2 in list already
-                      {false,true,true,_}-> getVarsA(element(3,BooleanExp),List);
-                      %element 2 is new
-                      {false,true,false,_}-> getVarsA(element(3,BooleanExp),List ++ element(2,BooleanExp));
-
+                      {true,true}-> getVarsA(element(2,BooleanExp),List) ++ getVarsA(element(3,BooleanExp),List);
+                      %element 3 adds to list
+                      {true,false}-> getVarsA(element(2,BooleanExp), [element(3,BooleanExp)] ++ List);
+                      %element 2 adds to list
+                      {false,true}-> getVarsA(element(3,BooleanExp),[element(2,BooleanExp)] ++ List);
                       %--------------------------both elements are Variables:------------------------------
-                      {false,false,false,false} -> List ++ element(2,BooleanExp) ++ element(3,BooleanExp);
-                      {false,false,true,false} -> List ++ element(2,BooleanExp) ;
-                      {false,false,false,true} -> List ++ element(3,BooleanExp);
-                      %{false,false,true,true} -> List
-                      {_,_,_,_}-> List
-
+                      {_,_} -> [element(2,BooleanExp)] ++ [element(3,BooleanExp)] ++ List
                     end;
 getVarsA(_,_)->error.
+%---------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 
