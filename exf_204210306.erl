@@ -9,7 +9,7 @@
 -author("amit").
 
 %% API
--export([setVar/3,reduceBool/1]).
+-export([setVar/3,reduceBool/1,getVars/1]).
 
 %----------------------------------------------------------------------------------------------```-----------------------------------------------------
 %---- setVar: sets a value to an Argument,  for example: setVar(x1,true,{and,x1,x2}) -> {and,1,x2}
@@ -61,6 +61,43 @@ reduceBool(BooleanExp) when element(1, BooleanExp) == 'or'-> if (element(2,Boole
                                                               end;
 reduceBool(_)-> error.
 %---------------------------------------------------------------------------------------------------------------------------------------------------
+%------------ returns List of the unique Variables
+getVars(BooleanExp) -> getVarsA(BooleanExp,[]).
+
+getVarsA(BooleanExp,List) when not is_tuple(BooleanExp) -> List; %recursion base
+getVarsA(BooleanExp,List) when element(1, BooleanExp) == 'not' ->
+                    %-----check: if what come after not is tuple , if its alreadt in List
+                    case {is_tuple(element(2,BooleanExp)),lists:member(element(2,BooleanExp),List)} of
+                      {true,_}-> getVarsA(element(2,BooleanExp),List);
+                      {false,true} -> List;
+                      {false,false} -> List ++ element(2,BooleanExp)
+                    end;
+getVarsA(BooleanExp,List) when (element(1, BooleanExp) == 'or') or (element(1, BooleanExp) == 'and') ->
+                %-----check: if what come after or/and is tuple , if its alreadt in List
+                %------------2-------------------------------3---------------------------------2-----------------------------------------3------------
+                    case {is_tuple(element(2,BooleanExp)),is_tuple(element(3,BooleanExp)),lists:member(element(2,BooleanExp),List),lists:member(element(3,BooleanExp),List)} of
+                      %------------one or two of the elements are tuples:------------------------------
+                      %both elements are tuples
+                      {true,true,_,_}-> getVarsA(element(2,BooleanExp),List ++ getVarsA(element(3,BooleanExp),List));
+                      %it contains element 3 in list already
+                      {true,false,_,true}-> getVarsA(element(2,BooleanExp),List);
+                      %element 3 is new
+                      {true,false,_,false}-> getVarsA(element(2,BooleanExp),List ++ element(3,BooleanExp));
+                      %it contains element 2 in list already
+                      {false,true,true,_}-> getVarsA(element(3,BooleanExp),List);
+                      %element 2 is new
+                      {false,true,false,_}-> getVarsA(element(3,BooleanExp),List ++ element(2,BooleanExp));
+
+                      %--------------------------both elements are Variables:------------------------------
+                      {false,false,false,false} -> List ++ element(2,BooleanExp) ++ element(3,BooleanExp);
+                      {false,false,true,false} -> List ++ element(2,BooleanExp) ;
+                      {false,false,false,true} -> List ++ element(3,BooleanExp);
+                      %{false,false,true,true} -> List
+                      {_,_,_,_}-> List
+
+                    end;
+getVarsA(_,_)->error.
+
 
 
 
