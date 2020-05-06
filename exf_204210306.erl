@@ -9,33 +9,55 @@
 -author("amit").
 
 %% API
--export([setVar/3,reduceBool/1,getVars/1]).
+-export([setAndReduce/3,reduceBool/1,getVars/1]).
 
 %----------------------------------------------------------------------------------------------```-----------------------------------------------------
 %---- setVar: sets a value to an Argument,  for example: setVar(x1,true,{and,x1,x2}) -> {and,1,x2}
-setVar(Var,Value,BooleanExp) when (Value ==  1) or (Value == true) -> setA(Var,1,BooleanExp) ;
-setVar(Var,Value,BooleanExp) when (Value ==  0) or (Value == false) -> setA(Var,0,BooleanExp);
-setVar(_,_,_)  -> notACorrectValue.
+setAndReduce(Var,Value,BooleanExp) when (Value ==  1) or (Value == true) -> setA(Var,true,BooleanExp) ;
+setAndReduce(Var,Value,BooleanExp) when (Value ==  0) or (Value == false) -> setA(Var,false,BooleanExp);
+setAndReduce(_,_,_)  -> notACorrectValue.
 
-setA(Var,V,BooleanExp) when is_tuple(BooleanExp)  -> if % V is 0/1
-                                                      element(1, BooleanExp) == 'not'->
-                                                                  if element(2,BooleanExp) == Var -> {'not',V};
-                                                                   true -> {'not',setA(Var,V,setA(Var,V,element(2,BooleanExp)))}
-                                                                  end;
-                                                      element(1, BooleanExp) == 'and' ->
-                                                                  if element(2,BooleanExp) == Var -> {'and',V,setA(Var,V,element(3,BooleanExp))};
-                                                                  element(3,BooleanExp) == Var -> {'and',setA(Var,V,element(2,BooleanExp)),V};
-                                                                  true -> {'and',setA(Var,V,setA(Var,V,element(2,BooleanExp))),setA(Var,V,setA(Var,V,element(3,BooleanExp)))}
-                                                                  end;
-                                                      element(1, BooleanExp) == 'or' ->
-                                                                  if element(2,BooleanExp) == Var -> {'or',V,setA(Var,V,element(3,BooleanExp))};
-                                                                    element(3,BooleanExp) == Var -> {'or',setA(Var,V,element(2,BooleanExp)),V};
-                                                                    true -> {'or',setA(Var,V,setA(Var,V,element(2,BooleanExp))),setA(Var,V,setA(Var,V,element(3,BooleanExp)))}
-                                                                  %^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ check this ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-                                                                  end;
-                                                     true -> errorNotATuple
-                                                    end;
-setA(_,_,BooleanExp) -> BooleanExp. % in case its not a tuple its a Var.
+setA(Var,V,BooleanExp) when (is_tuple(BooleanExp)) and (element(1, BooleanExp) == 'not') ->
+                            if element(2, BooleanExp) == Var  -> not V;
+                                  element(2, BooleanExp) == Var -> not V;
+                                  element(2, BooleanExp) == true -> false;
+                                  element(2, BooleanExp) == false -> true;
+                                  is_tuple(element(2, BooleanExp)) ->setA(Var,V,{'not',setA(Var,V,element(2, BooleanExp))});
+                                  true->BooleanExp
+                                end;
+setA(Var,V,BooleanExp) when (is_tuple(BooleanExp)) and (element(1, BooleanExp) == 'and') -> _Tuple = erlang:element(2, BooleanExp),
+                                              if
+                                                element(1, _Tuple) == Var -> if V==false -> false;
+                                                                                true-> setA(Var,V,element(2, _Tuple))
+                                                                                end;
+                                                element(2, _Tuple) == Var -> if V==false -> false;
+                                                                                 true-> setA(Var,V,element(1, _Tuple))
+                                                                               end;
+                                                element(1, _Tuple) == false -> false;
+                                                element(2, _Tuple) == false -> false;
+                                                element(1, _Tuple) == true -> setA(Var,V,element(2, _Tuple));
+                                                element(2, _Tuple) == true -> setA(Var,V,element(1, _Tuple));
+
+                                              true->setA(Var,V,{'and',{setA(Var,V,element(1, _Tuple)),setA(Var,V,element(2, _Tuple))}})
+                                            end;
+setA(Var,V,BooleanExp) when (is_tuple(BooleanExp)) and (element(1, BooleanExp) == 'or') -> _Tuple = erlang:element(2, BooleanExp),
+                    if
+                      element(1, _Tuple) == true -> true;
+                      element(2, _Tuple) == true -> true;
+                      element(1, _Tuple) == false ->setA(Var,V,element(2, _Tuple));
+                      element(2, _Tuple) == false ->setA(Var,V,element(1, _Tuple));
+                      element(1, _Tuple) == Var -> if V==true -> true;
+                                                     true-> setA(Var,V,element(2, _Tuple)) %V=false
+                                                   end;
+                      element(2, _Tuple) == Var -> if V==true -> true;
+                                                     true-> setA(Var,V,element(1, _Tuple)) %V=false
+                                                   end;
+
+
+                      true->setA(Var,V,{'or',{setA(Var,V,element(1, _Tuple)),setA(Var,V,element(2, _Tuple))}})
+                    end;
+
+setA(_,_,BooleanExp) ->  BooleanExp.  % in case its not a tuple its a Var.
 %---------------------------------------------------------------------------------------------------------------------------------------------------
 %---- reduce the BooleanExp: for exp: reduceBool({and,0,x2}) -> 0; reduceBool({and,1,x2}) -> x2
 reduceBool(BooleanExp) when not is_tuple(BooleanExp)-> BooleanExp;
@@ -61,7 +83,7 @@ reduceBool(BooleanExp) when element(1, BooleanExp) == 'or'-> if (element(2,Boole
                                                               end;
 reduceBool(_)-> error.
 %---------------------------------------------------------------------------------------------------------------------------------------------------
-%------------ returns List of the unique Variables
+%------------ returns List of the Variables
 getVars(BooleanExp) ->  Set = sets:from_list(getVarsA (BooleanExp,[])), sets:to_list(Set). %removes duplications
 
 %gets all the Variables with duplicates
