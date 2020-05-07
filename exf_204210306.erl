@@ -9,7 +9,7 @@
 -author("amit").
 
 %% API
--export([exp_to_bdd/2,setVariable/3,reduceBool/1,getVars/1,makeBdd/2,tree_height/1,num_of_leafs/1,num_of_nodes/1]).
+-export([exp_to_bdd/2,solve_bdd/2,setVariable/3,reduceBool/1,getVars/1,makeBdd/2,tree_height/1,num_of_leafs/1,num_of_nodes/1,getFromList/2]).
 
 %----------------------------------------------------------------------------------------------```-----------------------------------------------------
 %---- setVariable: sets a value to an Argument  the function,  for example: setVar(x1,false,{and,x1,x2}) -> {and,false,x2}
@@ -104,6 +104,9 @@ num_of_leafs(_)-> error.
 perms([]) -> [[]];
 perms(L)  -> [[H|T] || H <- L, T <- perms(L--[H])].
 %---------------------------------------------------------------------------------------------------------------------------------------------------
+exp_to_bdd({},_)  -> {};
+exp_to_bdd(BoolFunc,_) when (not is_tuple(BoolFunc)) and not ((BoolFunc=:=true) or (BoolFunc=:= false)) -> error;
+
 exp_to_bdd(BoolFunc,tree_height)-> Perms = [L||L<-perms(getVars(BoolFunc))], %makes list of all the vars permutations possible.
   getMinTree([{makeBdd(BoolFunc,VarsList),tree_height(makeBdd(BoolFunc,VarsList))}||VarsList<-Perms]); %make list of tuples: {BddTree,height}
 exp_to_bdd(BoolFunc,num_of_nodes)-> Perms = [L||L<-perms(getVars(BoolFunc))], %makes list of all the vars permutations possible.
@@ -123,7 +126,15 @@ getMinTree ([H|T],MinTree,MinVal) -> if
                                       element(2,H) < MinVal -> getMinTree (T,element(1,H),element(2,H));
                                       true-> getMinTree (T,MinTree,MinVal)
                                      end.
-
-
-
-
+%---------------------------------------------------------------------------------------------------------------------------------------------------
+%------- solve_bdd(BddTree, [{x1,Val1},{x2,Val2},{x3,Val3},{x4,Val4}])
+solve_bdd(A,_) when not is_tuple(A) -> A;
+solve_bdd({X,L,R}, List) -> Value= getFromList(X,List),
+  if (Value == true) or (Value == 1) -> solve_bdd(R,List); %case True- go right
+    (Value == false) or (Value == 0) -> solve_bdd(L,List); %case False- go left
+    true->error end.
+%---------------------------------------------------------------------------------------------------------------------------------------------------
+% gets the tuple cotains {H1,_} in List
+getFromList(A,[{A,Value}|_]) -> Value; %if the A match to the one in the Head, return the Value
+getFromList(A,[_|T]) -> getFromList(A,T);% if it doesnt match -> recurse with the Tail
+getFromList(_,_)-> error.
