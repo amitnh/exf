@@ -105,40 +105,27 @@ perms([]) -> [[]];
 perms(L)  -> [[H|T] || H <- L, T <- perms(L--[H])].
 %---------------------------------------------------------------------------------------------------------------------------------------------------
 exp_to_bdd(BoolFunc,tree_height)-> Perms = [L||L<-perms(getVars(BoolFunc))], %makes list of all the vars permutations possible.
-  getMinTree([{Tree,tree_height(Tree)}||VarsList<-Perms,Tree=makeBdd(BoolFunc,VarsList)]); %make list of tuples: {BddTree,height}
+  getMinTree([{makeBdd(BoolFunc,VarsList),tree_height(makeBdd(BoolFunc,VarsList))}||VarsList<-Perms]); %make list of tuples: {BddTree,height}
 exp_to_bdd(BoolFunc,num_of_nodes)-> Perms = [L||L<-perms(getVars(BoolFunc))], %makes list of all the vars permutations possible.
-  getMinTree([{Tree,num_of_nodes(Tree)}||VarsList<-Perms,Tree=makeBdd(BoolFunc,VarsList)]);%make list of tuples: {BddTree,nodes}
+  getMinTree([{makeBdd(BoolFunc,VarsList),num_of_nodes(makeBdd(BoolFunc,VarsList))}||VarsList<-Perms]);%make list of tuples: {BddTree,nodes}
 exp_to_bdd(BoolFunc,num_of_leafs)-> Perms = [L||L<-perms(getVars(BoolFunc))], %makes list of all the vars permutations possible.
-  getMinTree([{Tree,num_of_leafs(Tree)}||VarsList<-Perms,Tree=makeBdd(BoolFunc,VarsList)]);%make list of tuples: {BddTree,leafs}
+  getMinTree([{makeBdd(BoolFunc,VarsList),num_of_leafs(makeBdd(BoolFunc,VarsList))}||VarsList<-Perms]);%make list of tuples: {BddTree,leafs}
 exp_to_bdd(_, _)-> error.
 
 %---------------------------------------------------------------------------------------------------------------------------------------------------
 
 %gets the min tree from list of trees and Values
-getMinTree(List) when is_list(List)->getMinTree(List,first,first,first,first);
+getMinTree(List) when is_list(List)->getMinTree(List,first,first);
 getMinTree(_)-> error.
 
-getMinTree(List,first,_,_,_) -> FirstTuple= lists:ntn(1,List), %takes the first tree
-  getMinTree(List,element(1,FirstTuple),element(2,FirstTuple),length(List),2);
+getMinTree([H|T],first,_) -> getMinTree(T,element(1,H),element(2,H));%takes the first tree
 
-getMinTree (_,MinTree,_,ListSize,Counter) when Counter>ListSize -> MinTree; %recursion end, when we scanned all the trees
-getMinTree (List,MinTree,MinVal,ListSize,Counter) -> Tuple=lists:ntn(Counter,List), % main loop: takes the minimal Tree and Saves it
-                                                      if
-                                                       element(2,Tuple) < MinVal -> getMinTree (List,element(1,Tuple),element(2,Tuple),ListSize,Counter+1);
-                                                        true-> getMinTree (List,MinTree,MinVal,ListSize,Counter+1)
-                                                     end.
-
-
-
-%%ite(_,CurrFunc,Rank,Step,_) when Rank+1 =:= Step-> eval(CurrFunc);
-%%ite(OrigFunc,CurrFunc,Rank,Step,Perm) ->
-%%  CurrVar = varNum(OrigFunc,Rank,lists:nth(Step,Perm)),
-%%  Low = ite(OrigFunc,assignNext(CurrFunc,0,CurrVar),Rank,Step+1,Perm),
-%%  High = ite(OrigFunc,assignNext(CurrFunc,1,CurrVar),Rank,Step+1,Perm),
-%%  if
-%%    Low =:= High  -> Low;
-%%    true -> {CurrVar,{Low,High}}
-%%  end.
+getMinTree ([],MinTree,_) -> MinTree; %recursion end, when we scanned all the trees
+getMinTree ([H|T],MinTree,MinVal) ->
+                                    if
+                                     element(2,H) < MinVal -> getMinTree (T,element(1,H),element(2,H));
+                                      true-> getMinTree (T,MinTree,MinVal)
+                                   end.
 
 
 
