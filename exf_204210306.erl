@@ -9,7 +9,7 @@
 -author("amit").
 
 %% API
--export([setVariable/3,reduceBool/1,getVars/1,makeBdd/2,bddHeight/1]).
+-export([exp_to_bdd/2,setVariable/3,reduceBool/1,getVars/1,makeBdd/2,tree_height/1,num_of_leafs/1,num_of_nodes/1]).
 
 %----------------------------------------------------------------------------------------------```-----------------------------------------------------
 %---- setVariable: sets a value to an Argument  the function,  for example: setVar(x1,false,{and,x1,x2}) -> {and,false,x2}
@@ -83,9 +83,50 @@ CurrVar= lists:nth(Counter,VarsList),
   end.
 %---------------------------------------------------------------------------------------------------------------------------------------------------
 %-------bddHeight- returns the Bdd Height
-bddHeight(Bdd) when not is_tuple(Bdd)-> 0;
-bddHeight({_,A,B}) -> max(bddHeight(A),bddHeight(B))+1;
-bddHeight(_)-> error.
+tree_height(A) when is_boolean(A)-> 0;
+tree_height({_,A,B}) -> max(tree_height(A),tree_height(B))+1;
+tree_height(_)-> error.
+%---------------------------------------------------------------------------------------------------------------------------------------------------
+%-------num_of_nodes- returns the Bdd num_of_nodes
+num_of_nodes(A) when is_boolean(A)-> 0;
+num_of_nodes({_,A,B}) -> num_of_nodes(A) + num_of_nodes(B) + 1; %im a node if im a tuple
+num_of_nodes(_)-> error.
+%---------------------------------------------------------------------------------------------------------------------------------------------------
+%-------num_of_leafs- returns the Bdd num_of_leafs
+num_of_leafs(A) when is_boolean(A)-> 0;
+num_of_leafs({_,A,B}) when is_boolean(A) -> num_of_leafs(B) + 1; %im a leaf
+num_of_leafs({_,A,B}) when is_boolean(B) -> num_of_leafs(A) + 1; %im a leaf
+num_of_leafs({_,A,B}) -> num_of_leafs(A)+num_of_leafs(B); %im not a leaf
+num_of_leafs(_)-> error.
+
+%---------------------------------------------------------------------------------------------------------------------------------------------------
+% makes all permutations of a list
+perms([]) -> [[]];
+perms(L)  -> [[H|T] || H <- L, T <- perms(L--[H])].
+%---------------------------------------------------------------------------------------------------------------------------------------------------
+exp_to_bdd(BoolFunc,tree_height)-> Perms = [L||L<-perms(getVars(BoolFunc))], %makes list of all the vars permutations possible.
+  getMinTree([{Tree,tree_height(Tree)}||VarsList<-Perms,Tree=makeBdd(BoolFunc,VarsList)]); %make list of tuples: {BddTree,height}
+exp_to_bdd(BoolFunc,num_of_nodes)-> Perms = [L||L<-perms(getVars(BoolFunc))], %makes list of all the vars permutations possible.
+  getMinTree([{Tree,num_of_nodes(Tree)}||VarsList<-Perms,Tree=makeBdd(BoolFunc,VarsList)]);%make list of tuples: {BddTree,nodes}
+exp_to_bdd(BoolFunc,num_of_leafs)-> Perms = [L||L<-perms(getVars(BoolFunc))], %makes list of all the vars permutations possible.
+  getMinTree([{Tree,num_of_leafs(Tree)}||VarsList<-Perms,Tree=makeBdd(BoolFunc,VarsList)]);%make list of tuples: {BddTree,leafs}
+exp_to_bdd(_, _)-> error.
+
+%---------------------------------------------------------------------------------------------------------------------------------------------------
+
+%gets the min tree from list of trees and Values
+getMinTree(List) when is_list(List)->getMinTree(List,first,first,first,first);
+getMinTree(_)-> error.
+
+getMinTree(List,first,_,_,_) -> FirstTuple= lists:ntn(1,List), %takes the first tree
+  getMinTree(List,element(1,FirstTuple),element(2,FirstTuple),length(List),2);
+
+getMinTree (_,MinTree,_,ListSize,Counter) when Counter>ListSize -> MinTree; %recursion end, when we scanned all the trees
+getMinTree (List,MinTree,MinVal,ListSize,Counter) -> Tuple=lists:ntn(Counter,List), % main loop: takes the minimal Tree and Saves it
+                                                      if
+                                                       element(2,Tuple) < MinVal -> getMinTree (List,element(1,Tuple),element(2,Tuple),ListSize,Counter+1);
+                                                        true-> getMinTree (List,MinTree,MinVal,ListSize,Counter+1)
+                                                     end.
 
 
 
