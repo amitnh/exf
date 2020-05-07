@@ -5,11 +5,11 @@
 %%%
 %%% @end
 %%%-------------------------------------------------------------------
--module(exf_204210306).
+-module(exfb_204210306).
 -author("amit").
 
 %% API
--export([exp_to_bdd/2,solve_bdd/2,setVariable/3,reduceBool/1,getVars/1,makeBdd/2,tree_height/1,num_of_leafs/1,num_of_nodes/1,getFromList/2]).
+-export([exp_to_bdd/2,solve_bdd/2,booleanGenerator/2,setVariable/3,reduceBool/1,getVars/1,makeBdd/2,tree_height/1,num_of_leafs/1,num_of_nodes/1,getFromList/2,randomVar/1,randomBool/2]).
 
 %----------------------------------------------------------------------------------------------```-----------------------------------------------------
 %---- setVariable: sets a value to an Argument  the function,  for example: setVar(x1,false,{and,x1,x2}) -> {and,false,x2}
@@ -138,3 +138,36 @@ solve_bdd({X,L,R}, List) -> Value= getFromList(X,List),
 getFromList(A,[{A,Value}|_]) -> Value; %if the A match to the one in the Head, return the Value
 getFromList(A,[_|T]) -> getFromList(A,T);% if it doesnt match -> recurse with the Tail
 getFromList(_,_)-> error.
+
+
+
+
+%---------------------------------------------------------------------------------------------------------------------------------------------------
+%%booleanGenerator(NumOfVars,NumOfEquations)->[Eq1,Eq2,Eq3…]
+booleanGenerator(NumOfVars,NumOfEquations)->b.
+
+%---------------------------------------------------------------------------------------------------------------------------------------------------
+%randomBool makes one boolean func with NumOfFunction functions
+randomBool(N,1) -> randomVar(N);
+randomBool(NumOfVars,NumOfFunction) -> Head=randHead(), % head is not/and/or
+  case (rand:uniform(7) div 4) of %make the chance to be "3" -> 1/7, and 0/1/2 -> 2/7
+    0-> if Head == 'not' -> {Head,randomBool(NumOfVars,NumOfFunction-1)};
+           true-> {Head,randomBool(NumOfVars,(NumOfFunction div 2) +3),randomBool(NumOfVars,(NumOfFunction div 2) +3)}
+        end;
+    1-> if Head == 'not' -> {Head,randomBool(NumOfVars,NumOfFunction-1)};
+          true-> {randomVar(NumOfVars),{Head,randomBool(NumOfVars,NumOfFunction-1)}}
+        end;
+    2-> if Head == 'not' -> {Head,randomBool(NumOfVars,NumOfFunction-1)};
+          true-> {{Head,randomBool(NumOfVars,NumOfFunction-1)},randomVar(NumOfVars)}
+        end;
+    true-> if Head == 'not' -> {Head,randomVar(NumOfVars)};
+           true-> {randomVar(NumOfVars),randomVar(NumOfVars)}
+         end
+    end.
+
+randHead()-> case rand:uniform(3) of
+               1-> 'not';
+               2-> 'or';
+               3-> 'and'
+             end.
+randomVar(N)-> list_to_atom(lists:flatten(io_lib:format("x~B", [rand:uniform(N)]))). %give random x1/x2/x3... between 1-N
