@@ -113,19 +113,16 @@ exp_to_bdd(BoolFunc,num_of_leafs)-> Perms = [L||L<-perms(getVars(BoolFunc))], %m
 exp_to_bdd(_, _)-> error.
 
 %---------------------------------------------------------------------------------------------------------------------------------------------------
-
-%gets the min tree from list of trees and Values
+%gets the min tree from list of trees and Values [{1Tree,1Val},{2Tree,2Val}.......] -> Tree [by min(Val)]
 getMinTree(List) when is_list(List)->getMinTree(List,first,first);
 getMinTree(_)-> error.
 
 getMinTree([H|T],first,_) -> getMinTree(T,element(1,H),element(2,H));%takes the first tree
-
 getMinTree ([],MinTree,_) -> MinTree; %recursion end, when we scanned all the trees
-getMinTree ([H|T],MinTree,MinVal) ->
-                                    if
-                                     element(2,H) < MinVal -> getMinTree (T,element(1,H),element(2,H));
+getMinTree ([H|T],MinTree,MinVal) -> if
+                                      element(2,H) < MinVal -> getMinTree (T,element(1,H),element(2,H));
                                       true-> getMinTree (T,MinTree,MinVal)
-                                   end.
+                                     end.
 
 
 
