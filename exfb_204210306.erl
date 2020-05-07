@@ -152,16 +152,16 @@ randomBool(N,1) -> randomVar(N);
 randomBool(NumOfVars,NumOfFunction) -> Head=randHead(), % head is not/and/or
   case (rand:uniform(7) div 4) of %make the chance to be "3" -> 1/7, and 0/1/2 -> 2/7
     0-> if Head == 'not' -> {Head,randomBool(NumOfVars,NumOfFunction-1)};
-           true-> {Head,randomBool(NumOfVars,(NumOfFunction div 2) +3),randomBool(NumOfVars,(NumOfFunction div 2) +3)}
+           true-> {Head,{randomBool(NumOfVars,(NumOfFunction div 2) +3),randomBool(NumOfVars,(NumOfFunction div 2) +3)}}
         end;
     1-> if Head == 'not' -> {Head,randomBool(NumOfVars,NumOfFunction-1)};
-          true-> {randomVar(NumOfVars),{Head,randomBool(NumOfVars,NumOfFunction-1)}}
+          true-> {Head,{randomVar(NumOfVars),randomBool(NumOfVars,NumOfFunction-1)}}
         end;
     2-> if Head == 'not' -> {Head,randomBool(NumOfVars,NumOfFunction-1)};
-          true-> {{Head,randomBool(NumOfVars,NumOfFunction-1)},randomVar(NumOfVars)}
+          true-> {Head,{randomBool(NumOfVars,NumOfFunction-1),randomVar(NumOfVars)}}
         end;
     true-> if Head == 'not' -> {Head,randomVar(NumOfVars)};
-           true-> {randomVar(NumOfVars),randomVar(NumOfVars)}
+           true-> {Head,{randomVar(NumOfVars),randomVar(NumOfVars)}}
          end
     end.
 
