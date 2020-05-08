@@ -9,7 +9,7 @@
 -author("amit").
 
 %% API
--export([exp_to_bdd/2,solve_bdd/2,booleanGenerator/2]).
+-export([exp_to_bdd/2,solve_bdd/2,booleanGenerator/2,tests/2,randomBool/2,makeBdd/2,getVars/1]).
 %,setVariable/3,reduceBool/1,getVars/1,makeBdd/2,tree_height/1,num_of_leafs/1,num_of_nodes/1,getFromList/2,randomVar/1,randomBool/2
 %----------------------------------------------------------------------------------------------```-----------------------------------------------------
 %---- setVariable: sets a value to an Argument  the function,  for example: setVar(x1,false,{and,x1,x2}) -> {and,false,x2}
@@ -107,31 +107,39 @@ perms(L)  -> [[H|T] || H <- L, T <- perms(L--[H])].
 exp_to_bdd({},_)  -> {};
 exp_to_bdd(BoolFunc,_) when (not is_tuple(BoolFunc)) and not ((BoolFunc=:=true) or (BoolFunc=:= false)) -> error;
 
-exp_to_bdd(BoolFunc,tree_height)-> Perms = [L||L<-perms(getVars(BoolFunc))], %makes list of all the vars permutations possible.
-  getMinTree([{makeBdd(BoolFunc,VarsList),tree_height(makeBdd(BoolFunc,VarsList))}||VarsList<-Perms]); %make list of tuples: {BddTree,height}
-exp_to_bdd(BoolFunc,num_of_nodes)-> Perms = [L||L<-perms(getVars(BoolFunc))], %makes list of all the vars permutations possible.
-  getMinTree([{makeBdd(BoolFunc,VarsList),num_of_nodes(makeBdd(BoolFunc,VarsList))}||VarsList<-Perms]);%make list of tuples: {BddTree,nodes}
-exp_to_bdd(BoolFunc,num_of_leafs)-> Perms = [L||L<-perms(getVars(BoolFunc))], %makes list of all the vars permutations possible.
-  getMinTree([{makeBdd(BoolFunc,VarsList),num_of_leafs(makeBdd(BoolFunc,VarsList))}||VarsList<-Perms]);%make list of tuples: {BddTree,leafs}
+exp_to_bdd(BoolFunc,tree_height)->
+  StartTime = os:timestamp(),
+  Perms = [L||L<-perms(getVars(BoolFunc))], %makes list of all the vars permutations possible.
+  getMinTree([{makeBdd(BoolFunc,VarsList),tree_height(makeBdd(BoolFunc,VarsList))}||VarsList<-Perms],StartTime); %make list of tuples: {BddTree,height}
+exp_to_bdd(BoolFunc,num_of_nodes)->
+  StartTime = os:timestamp(),
+  Perms = [L||L<-perms(getVars(BoolFunc))], %makes list of all the vars permutations possible.
+  getMinTree([{makeBdd(BoolFunc,VarsList),num_of_nodes(makeBdd(BoolFunc,VarsList))}||VarsList<-Perms],StartTime);%make list of tuples: {BddTree,nodes}
+exp_to_bdd(BoolFunc,num_of_leafs)->
+  StartTime = os:timestamp(),
+  Perms = [L||L<-perms(getVars(BoolFunc))], %makes list of all the vars permutations possible.
+  getMinTree([{makeBdd(BoolFunc,VarsList),num_of_leafs(makeBdd(BoolFunc,VarsList))}||VarsList<-Perms],StartTime);%make list of tuples: {BddTree,leafs}
 exp_to_bdd(_, _)-> error.
 
 %---------------------------------------------------------------------------------------------------------------------------------------------------
 %gets the min tree from list of trees and Values [{1Tree,1Val},{2Tree,2Val}.......] -> Tree [by min(Val)]
-getMinTree(List) when is_list(List)->getMinTree(List,first,first);
-getMinTree(_)-> error.
+getMinTree(List,StartTime) when is_list(List)->getMinTree(List,first,first,StartTime);
+getMinTree(_,_)-> error.
 
-getMinTree([H|T],first,_) -> getMinTree(T,element(1,H),element(2,H));%takes the first tree
-getMinTree ([],MinTree,_) -> MinTree; %recursion end, when we scanned all the trees
-getMinTree ([H|T],MinTree,MinVal) -> if
-                                      element(2,H) < MinVal -> getMinTree (T,element(1,H),element(2,H));
-                                      true-> getMinTree (T,MinTree,MinVal)
+getMinTree([H|T],first,_,StartTime) -> getMinTree(T,element(1,H),element(2,H),StartTime);%takes the first tree
+getMinTree ([],MinTree,_,StartTime) -> io:format("Total Time of Function: ~f miliseconds~n", [timer:now_diff(os:timestamp(), StartTime) / 1000]),MinTree; %recursion end, when we scanned all the trees
+getMinTree ([H|T],MinTree,MinVal,StartTime) -> if
+                                      element(2,H) < MinVal -> getMinTree (T,element(1,H),element(2,H),StartTime);
+                                      true-> getMinTree (T,MinTree,MinVal,StartTime)
                                      end.
 %---------------------------------------------------------------------------------------------------------------------------------------------------
 %------- solve_bdd(BddTree, [{x1,Val1},{x2,Val2},{x3,Val3},{x4,Val4}])
-solve_bdd(A,_) when not is_tuple(A) -> A;
-solve_bdd({X,L,R}, List) -> Value= getFromList(X,List),
-  if (Value == true) or (Value == 1) -> solve_bdd(R,List); %case True- go right
-    (Value == false) or (Value == 0) -> solve_bdd(L,List); %case False- go left
+solve_bdd(Boolexp,List)-> solve_bdd_time(Boolexp,List,os:timestamp()).
+
+solve_bdd_time(A,_,StartTime) when not is_tuple(A) -> io:format("Total Time of Function: ~f miliseconds~n", [timer:now_diff(os:timestamp(), StartTime) / 1000]),A;
+solve_bdd_time({X,L,R}, List,StartTime) -> Value= getFromList(X,List),
+  if (Value == true) or (Value == 1) -> solve_bdd_time(R,List,StartTime); %case True- go right
+    (Value == false) or (Value == 0) -> solve_bdd_time(L,List,StartTime); %case False- go left
     true->error end.
 %---------------------------------------------------------------------------------------------------------------------------------------------------
 % gets the tuple cotains {H1,_} in List
@@ -144,11 +152,12 @@ getFromList(_,_)-> error.
 
 %---------------------------------------------------------------------------------------------------------------------------------------------------
 %%booleanGenerator(NumOfVars,NumOfEquations)->[Eq1,Eq2,Eq3…]
-booleanGenerator(NumOfVars,NumOfEquations) when is_integer(NumOfVars) and is_integer(NumOfEquations)->booleanGenerator(NumOfVars,NumOfEquations,[]);
+booleanGenerator(NumOfVars,NumOfEquations) when is_integer(NumOfVars) and is_integer(NumOfEquations)-> StartTime = os:timestamp()
+,booleanGenerator(NumOfVars,NumOfEquations,[],StartTime);
 booleanGenerator(_,_)-> errorNotIntegers.
 
-booleanGenerator(_,0,List)-> List;
-booleanGenerator(NumOfVars,NumOfEquations,List)-> booleanGenerator(NumOfVars,NumOfEquations-1,List ++ [randomBool(NumOfVars,NumOfVars*2)]).
+booleanGenerator(_,0,List,StartTime)-> io:format("Total Time of Function: ~f miliseconds~n", [timer:now_diff(os:timestamp(), StartTime) / 1000]),List;
+booleanGenerator(NumOfVars,NumOfEquations,List,StartTime)-> booleanGenerator(NumOfVars,NumOfEquations-1,List ++ [randomBool(NumOfVars,NumOfVars*2)],StartTime).
 %---------------------------------------------------------------------------------------------------------------------------------------------------
 %randomBool makes one boolean func with NumOfFunction (more or less) functions
 randomBool(N,1) -> randomVar(N);
@@ -176,3 +185,8 @@ randHead()-> case rand:uniform(5) of
                5-> 'and'
              end.
 randomVar(N)-> list_to_atom(lists:flatten(io_lib:format("x~B", [rand:uniform(N)]))). %give random x1/x2/x3... between 1-N
+%---------------------------------------------------------------------------------------------------------------------------------------------------
+%tests
+%---------------------------------------------------------------------------------------------------------------------------------------------------
+tests(NumOfVars,NumOfEquations)-> [{exp_to_bdd(X,tree_height)}||X<-booleanGenerator(NumOfVars,NumOfEquations)].
+%,exp_to_bdd(X,num_of_nodes),exp_to_bdd(X,num_of_leafs)
