@@ -144,15 +144,18 @@ getFromList(_,_)-> error.
 
 %---------------------------------------------------------------------------------------------------------------------------------------------------
 %%booleanGenerator(NumOfVars,NumOfEquations)->[Eq1,Eq2,Eq3…]
-booleanGenerator(NumOfVars,NumOfEquations)->b.
+booleanGenerator(NumOfVars,NumOfEquations) when is_integer(NumOfVars) and is_integer(NumOfEquations)->booleanGenerator(NumOfVars,NumOfEquations,[]);
+booleanGenerator(_,_)-> errorNotIntegers.
 
+booleanGenerator(_,0,List)-> List;
+booleanGenerator(NumOfVars,NumOfEquations,List)-> booleanGenerator(NumOfVars,NumOfEquations-1,List ++ [randomBool(NumOfVars,NumOfVars*2)]).
 %---------------------------------------------------------------------------------------------------------------------------------------------------
-%randomBool makes one boolean func with NumOfFunction functions
+%randomBool makes one boolean func with NumOfFunction (more or less) functions
 randomBool(N,1) -> randomVar(N);
 randomBool(NumOfVars,NumOfFunction) -> Head=randHead(), % head is not/and/or
   case (rand:uniform(7) div 4) of %make the chance to be "3" -> 1/7, and 0/1/2 -> 2/7
     0-> if Head == 'not' -> {Head,randomBool(NumOfVars,NumOfFunction-1)};
-           true-> {Head,{randomBool(NumOfVars,(NumOfFunction div 2) +3),randomBool(NumOfVars,(NumOfFunction div 2) +3)}}
+           true-> {Head,{randomBool(NumOfVars,(NumOfFunction div 2)),randomBool(NumOfVars,(NumOfFunction div 2))}}
         end;
     1-> if Head == 'not' -> {Head,randomBool(NumOfVars,NumOfFunction-1)};
           true-> {Head,{randomVar(NumOfVars),randomBool(NumOfVars,NumOfFunction-1)}}
@@ -160,14 +163,16 @@ randomBool(NumOfVars,NumOfFunction) -> Head=randHead(), % head is not/and/or
     2-> if Head == 'not' -> {Head,randomBool(NumOfVars,NumOfFunction-1)};
           true-> {Head,{randomBool(NumOfVars,NumOfFunction-1),randomVar(NumOfVars)}}
         end;
-    true-> if Head == 'not' -> {Head,randomVar(NumOfVars)};
+    3-> if Head == 'not' -> {Head,randomVar(NumOfVars)};
            true-> {Head,{randomVar(NumOfVars),randomVar(NumOfVars)}}
          end
     end.
 
-randHead()-> case rand:uniform(3) of
+randHead()-> case rand:uniform(5) of
                1-> 'not';
                2-> 'or';
-               3-> 'and'
+               3-> 'and';
+               4-> 'or';
+               5-> 'and'
              end.
 randomVar(N)-> list_to_atom(lists:flatten(io_lib:format("x~B", [rand:uniform(N)]))). %give random x1/x2/x3... between 1-N
