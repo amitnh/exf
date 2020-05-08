@@ -9,8 +9,8 @@
 -author("amit").
 
 %% API
--export([exp_to_bdd/2,solve_bdd/2,booleanGenerator/2,setVariable/3,reduceBool/1,getVars/1,makeBdd/2,tree_height/1,num_of_leafs/1,num_of_nodes/1,getFromList/2,randomVar/1,randomBool/2]).
-
+-export([exp_to_bdd/2,solve_bdd/2,booleanGenerator/2]).
+%,setVariable/3,reduceBool/1,getVars/1,makeBdd/2,tree_height/1,num_of_leafs/1,num_of_nodes/1,getFromList/2,randomVar/1,randomBool/2
 %----------------------------------------------------------------------------------------------```-----------------------------------------------------
 %---- setVariable: sets a value to an Argument  the function,  for example: setVar(x1,false,{and,x1,x2}) -> {and,false,x2}
 setVariable(Var,1,BooleanExp)-> setVar(Var,true,BooleanExp);
@@ -76,8 +76,8 @@ makeBdd(BooleanExp,VarsList)-> makeBddR(BooleanExp,BooleanExp,length(VarsList),1
 makeBddR(_,SubBoolFunc,NumOfVars,Counter,_) when Counter=:= NumOfVars+1 -> reduceBool(SubBoolFunc);
 makeBddR(BooleanExp,SubBoolFunc,NumOfVars,Counter,VarsList)->
 CurrVar= lists:nth(Counter,VarsList),
-  Left = makeBddR(BooleanExp,setVar(CurrVar,false,SubBoolFunc),NumOfVars,Counter+1,VarsList),
-  Right = makeBddR(BooleanExp,setVar(CurrVar,true,SubBoolFunc),NumOfVars,Counter+1,VarsList),
+  Left = makeBddR(BooleanExp,setVariable(CurrVar,false,SubBoolFunc),NumOfVars,Counter+1,VarsList),
+  Right = makeBddR(BooleanExp,setVariable(CurrVar,true,SubBoolFunc),NumOfVars,Counter+1,VarsList),
   if Right =:= Left -> Right;
     true-> {CurrVar,Left,Right}
   end.
