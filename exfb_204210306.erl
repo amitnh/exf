@@ -9,8 +9,8 @@
 -author("amit").
 
 %% API
--export([exp_to_bdd/2,solve_bdd/2,booleanGenerator/2,tests/2,randomBool/2,makeBdd/2,getVars/1]).
-%,setVariable/3,reduceBool/1,getVars/1,makeBdd/2,tree_height/1,num_of_leafs/1,num_of_nodes/1,getFromList/2,randomVar/1,randomBool/2
+-export([exp_to_bdd/2,solve_bdd/2,booleanGenerator/2]).
+%,setVariable/3,reduceBool/1,getVars/1,makeBdd/2,tree_height/1,num_of_leafs/1,num_of_nodes/1,getFromList/2,randomVar/1,randomBool/2,tests/2,randomBool/2,makeBdd/2,getVars/1,
 %----------------------------------------------------------------------------------------------```-----------------------------------------------------
 %---- setVariable: sets a value to an Argument  the function,  for example: setVar(x1,false,{and,x1,x2}) -> {and,false,x2}
 setVariable(Var,1,BooleanExp)-> setVar(Var,true,BooleanExp);
@@ -185,8 +185,7 @@ randHead()-> case rand:uniform(5) of
                5-> 'and'
              end.
 randomVar(N)-> list_to_atom(lists:flatten(io_lib:format("x~B", [rand:uniform(N)]))). %give random x1/x2/x3... between 1-N
-%---------------------------------------------------------------------------------------------------------------------------------------------------
 %tests
 %---------------------------------------------------------------------------------------------------------------------------------------------------
-tests(NumOfVars,NumOfEquations)-> [{exp_to_bdd(X,tree_height)}||X<-booleanGenerator(NumOfVars,NumOfEquations)].
-%,exp_to_bdd(X,num_of_nodes),exp_to_bdd(X,num_of_leafs)
+%tests(NumOfVars,NumOfEquations)-> [{exp_to_bdd(X,tree_height),exp_to_bdd(X,num_of_nodes),exp_to_bdd(X,num_of_leafs)}||X<-booleanGenerator(NumOfVars,NumOfEquations)].
+%
