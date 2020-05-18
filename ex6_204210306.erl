@@ -9,7 +9,7 @@
 -author("amit").
 
 %% API
--export([songList/1,songGen/3,getFirst/1,getLast/1,getLabels/2]).
+-export([songList/1,songGen/3]).
 %---------------------------------------------------------------
 
 songList(L) when is_list(L)-> songList(L,digraph:new([cyclic]));
