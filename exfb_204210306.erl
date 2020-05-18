@@ -24,7 +24,8 @@ setVar(_,_,A) when is_atom(A) or is_integer(A) -> A;
 setVar(Var,Value,{Var,Var}) -> {Value,Value};
 setVar(Var,Value,{A,Var}) -> {setVar(Var,Value,A),Value};
 setVar(Var,Value,{Var,B}) -> {Value,setVar(Var,Value,B)};
-setVar(Var,Value,{A,B}) -> {setVar(Var,Value,A),setVar(Var,Value,B)}.
+setVar(Var,Value,{A,B}) -> {setVar(Var,Value,A),setVar(Var,Value,B)};
+setVar(_,_,_)-> error.
 
 %----------------------------------------------------------------------------------------------```-----------------------------------------------------
 %---- reduceBool:  Reduce a Boolean  function,  for example: reduceBool({and,true,x2}) -> x2
@@ -60,27 +61,30 @@ reduceBool(_)-> error.
 
 %---------------------------------------------------------------------------------------------------------------------------------------------------
 %------------ returns List of the Variables [x1,x2,x3.....]
-getVars(BooleanExp) ->  Set = sets:from_list(getVarsA (BooleanExp)), sets:to_list(Set). %removes duplications
+
+getVars(error)-> error;
+getVars(L) when is_list(L)-> Set = sets:from_list(L), sets:to_list(Set);
+getVars(BooleanExp) ->  getVars(getVarsA(BooleanExp)).%removes duplications
 
 %getVarsA: gets all the Variables with duplicates:
 getVarsA(A) when not is_tuple(A) -> [A];
-getVarsA({A,B}) when (A == 'not') and (is_tuple(B)) -> getVarsA(B);
-getVarsA({A,B}) when A == 'not' -> [B];
-getVarsA({_,{B,C}})   -> getVarsA(B) ++ getVarsA(C);
-
+getVarsA({'not',B}) when is_tuple(B) -> getVarsA(B);
+getVarsA({'not',B}) -> [B];
+getVarsA({_,{B,C}}) -> getVarsA(B) ++ getVarsA(C);
 getVarsA(_)->error.
 %---------------------------------------------------------------------------------------------------------------------------------------------------
 %-------makeBdd- takes Boolean expression and list of Variables and make a Bdd tree by the order of the List
-makeBdd(BooleanExp,VarsList)-> makeBddR(BooleanExp,BooleanExp,length(VarsList),1,VarsList).
+makeBdd(BooleanExp,VarsList) when is_tuple(BooleanExp)-> makeBddR(BooleanExp,BooleanExp,length(VarsList),1,VarsList).
 
 makeBddR(_,SubBoolFunc,NumOfVars,Counter,_) when Counter=:= NumOfVars+1 -> reduceBool(SubBoolFunc);
-makeBddR(BooleanExp,SubBoolFunc,NumOfVars,Counter,VarsList)->
+makeBddR(BooleanExp,SubBoolFunc,NumOfVars,Counter,VarsList) ->
 CurrVar= lists:nth(Counter,VarsList),
   Left = makeBddR(BooleanExp,setVariable(CurrVar,false,SubBoolFunc),NumOfVars,Counter+1,VarsList),
   Right = makeBddR(BooleanExp,setVariable(CurrVar,true,SubBoolFunc),NumOfVars,Counter+1,VarsList),
   if Right =:= Left -> Right;
     true-> {CurrVar,Left,Right}
   end.
+
 %---------------------------------------------------------------------------------------------------------------------------------------------------
 %-------bddHeight- returns the Bdd Height
 tree_height(A) when is_boolean(A)-> 0;
@@ -107,18 +111,30 @@ perms(L)  -> [[H|T] || H <- L, T <- perms(L--[H])].
 exp_to_bdd({},_)  -> {};
 exp_to_bdd(BoolFunc,_) when (not is_tuple(BoolFunc)) and not ((BoolFunc=:=true) or (BoolFunc=:= false)) -> error;
 
-exp_to_bdd(BoolFunc,tree_height)->
+exp_to_bdd(BoolFunc,tree_height) when is_tuple(BoolFunc)->
   StartTime = os:timestamp(),
-  Perms = [L||L<-perms(getVars(BoolFunc))], %makes list of all the vars permutations possible.
-  getMinTree([{makeBdd(BoolFunc,VarsList),tree_height(makeBdd(BoolFunc,VarsList))}||VarsList<-Perms],StartTime); %make list of tuples: {BddTree,height}
-exp_to_bdd(BoolFunc,num_of_nodes)->
+  Vars = getVars(BoolFunc),
+  case Vars of error-> error;
+    _->
+  Perms = [L||L<-perms(Vars)], %makes list of all the vars permutations possible.
+  getMinTree([{makeBdd(BoolFunc,VarsList),tree_height(makeBdd(BoolFunc,VarsList))}||VarsList<-Perms],StartTime) %make list of tuples: {BddTree,height}
+  end;
+exp_to_bdd(BoolFunc,num_of_nodes) when is_tuple(BoolFunc)->
   StartTime = os:timestamp(),
-  Perms = [L||L<-perms(getVars(BoolFunc))], %makes list of all the vars permutations possible.
-  getMinTree([{makeBdd(BoolFunc,VarsList),num_of_nodes(makeBdd(BoolFunc,VarsList))}||VarsList<-Perms],StartTime);%make list of tuples: {BddTree,nodes}
-exp_to_bdd(BoolFunc,num_of_leafs)->
+  Vars = getVars(BoolFunc),
+  case Vars of error-> error;
+    _->
+  Perms = [L||L<-perms(Vars)], %makes list of all the vars permutations possible.
+  getMinTree([{makeBdd(BoolFunc,VarsList),num_of_nodes(makeBdd(BoolFunc,VarsList))}||VarsList<-Perms],StartTime)%make list of tuples: {BddTree,nodes}
+  end;
+exp_to_bdd(BoolFunc,num_of_leafs) when is_tuple(BoolFunc)->
   StartTime = os:timestamp(),
-  Perms = [L||L<-perms(getVars(BoolFunc))], %makes list of all the vars permutations possible.
-  getMinTree([{makeBdd(BoolFunc,VarsList),num_of_leafs(makeBdd(BoolFunc,VarsList))}||VarsList<-Perms],StartTime);%make list of tuples: {BddTree,leafs}
+  Vars = getVars(BoolFunc),
+  case Vars of error-> error;
+    _->
+  Perms = [L||L<-perms(Vars)], %makes list of all the vars permutations possible.
+  getMinTree([{makeBdd(BoolFunc,VarsList),num_of_leafs(makeBdd(BoolFunc,VarsList))}||VarsList<-Perms],StartTime)%make list of tuples: {BddTree,leafs}
+  end;
 exp_to_bdd(_, _)-> error.
 
 %---------------------------------------------------------------------------------------------------------------------------------------------------
@@ -137,10 +153,15 @@ getMinTree ([H|T],MinTree,MinVal,StartTime) -> if
 solve_bdd(Boolexp,List)-> solve_bdd_time(Boolexp,List,os:timestamp()).
 
 solve_bdd_time(A,_,StartTime) when not is_tuple(A) -> io:format("Total Time of Function: ~f miliseconds~n", [timer:now_diff(os:timestamp(), StartTime) / 1000]),A;
-solve_bdd_time({X,L,R}, List,StartTime) -> Value= getFromList(X,List),
+solve_bdd_time({X,L,R}, List,StartTime) when is_atom(X) -> Value= getFromList(X,List),
+  case Value of error-> error;
+    _->
   if (Value == true) or (Value == 1) -> solve_bdd_time(R,List,StartTime); %case True- go right
     (Value == false) or (Value == 0) -> solve_bdd_time(L,List,StartTime); %case False- go left
-    true->error end.
+    true->error end
+    end;
+solve_bdd_time(_,_,_)-> error.
+
 %---------------------------------------------------------------------------------------------------------------------------------------------------
 % gets the tuple cotains {H1,_} in List
 getFromList(A,[{A,Value}|_]) -> Value; %if the A match to the one in the Head, return the Value
