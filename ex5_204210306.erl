@@ -12,7 +12,7 @@
 -export([ring_parallel/2,numToAtom/1,atomToNum/1]).
 
 %----------------------------------------------------------------------------
-ring_parallel(N,M)-> register(N,spawn(fun()->node_loop([self()],1,[]) end)).
+ring_parallel(N,M)-> register(numToAtom(N),spawn(fun()->node_loop([self()],1,[]) end)).
 %%                     end,
 %%  receive
 %%    Msg-> io:format("Message: \"~f\" recieved.~n", [Msg]);
@@ -35,7 +35,7 @@ node_loop(ToList,C,History)->
     _-> node_loop(ToList,C,History)
   end.
 
-%takes Number and makes it an Atom node, for the register func. numToAtom(7)-> atom7.
+%takes Number and makes it an atom node, for the register func. numToAtom(7)-> node7.
 numToAtom(N) -> list_to_atom(lists:flatten(io_lib:format("node~B", [N]))).
 atomToNum(Atom)->list_to_integer(string:substr(atom_to_list(Atom),5)).
 
