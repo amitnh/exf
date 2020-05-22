@@ -9,53 +9,39 @@
 -author("amit").
 
 %% API
--export([ring_parallel/2]).
-%---------------------------------------------------------------
-%%% creates N processes thats point to one another.
-%%ring_parallel(N,M)->ring_parallel(N,N,M).
-%%ring_parallel(N,I,M)->spawn(ring_parallel_spawn(N,I,M,self(),self(),os:timestamp())).
-%%
-%%%creating the next chain and going into a recieve loop
-%%ring_parallel_spawn(_,1,M,To,First,StartTime)-> First ! {to,self()} ,ring_parallel_First(M,0,To,StartTime); %end of recursion. close the circle
-%%ring_parallel_spawn(N,I,M,To,First,StartTime)-> ring_parallel_spawn(N,I-1,M,self(),First,StartTime), spawn(ring_parallel_loop(To)).
-%%
-%%%sends M messages from First node
-%%ring_parallel_First(M,0,_,StartTime)->io:format("Total Time of Function: ~f miliseconds~n", [timer:now_diff(os:timestamp(), StartTime) / 1000]);
-%%ring_parallel_First(M,ToReceive,_,StartTime)->receive
-%%                              {M}->ring_parallel_First(M,ToReceive-1,0,StartTime)
-%%                            end;
-%%ring_parallel_First(M,ToReceive,To,StartTime)->
-%%
-%%  To ! {M}, ring_parallel_First(M-1,ToReceive,To,StartTime).
-%%
-%%
-%%ring_parallel_loop(To)->
-%%  receive
-%%    {Message}-> To ! Message
-%%  end.
-%----------------------------------------------------------------------------
-ring_parallel(N,M)->MesMap = makeMesMap(N).
+-export([ring_parallel/2,numToAtom/1,atomToNum/1]).
 
-%makes a List with N empty maps.
-makeMesMap(N)-> makeMesMap(N,[]).
-makeMesMap(0,MesMap)->MesMap;
-makeMesMap(N,MesMap)->makeMesMap(N-1,[#{}] ++ MesMap).
+%----------------------------------------------------------------------------
+ring_parallel(N,M)-> register(N,spawn(fun()->node_loop([self()],1,[]) end)).
+%%                     end,
+%%  receive
+%%    Msg-> io:format("Message: \"~f\" recieved.~n", [Msg]);
+%%    _->ring_parallel(2,M)
+
+
 
 %node_loop- each process is a node
 % ToList - list of nodes to send to
 % C- unique number
-%MesMap- List of maps, each node gets a map, thats saves his recieved messages
-node_loop(ToList,C,MesMap)->
+%History- list of messages history: [{C,Message1},{C,Message2},...]
+node_loop(ToList,C,History)->
   receive
-    {Message} -> if
-                   maps:is_key(Message,lists:nth(C,MesMap)) -> sendMes(ToList,Message);
-                   true-> banana
-                 end;
-    {addToList,Pid} -> node_loop(ToList ++ [Pid],C,MesMap);
-    _-> node_loop(ToList,C,MesMap)
+    {Message} -> IsMember= lists:member({C,Message},History),
+                if
+                   not IsMember-> sendMes(ToList,Message),node_loop(ToList,C,History++[{C,Message}]); % 1st time i receieved this msg
+                   true-> node_loop(ToList,C,History) %iv'e already recieved this msg
+                end;
+    {addToList,Pid} -> node_loop(ToList ++ [Pid],C,History);
+    _-> node_loop(ToList,C,History)
   end.
+
+%takes Number and makes it an Atom node, for the register func. numToAtom(7)-> atom7.
+numToAtom(N) -> list_to_atom(lists:flatten(io_lib:format("node~B", [N]))).
+atomToNum(Atom)->list_to_integer(string:substr(atom_to_list(Atom),5)).
+
 
 node_loop_master(ToList,C)->aaa.
 
+%send the message to all the members in lists
 sendMes([],Message)-> io:format("Message: \"~f\" sent.~n", [Message]);
 sendMes([H|ToList],Message)-> H ! Message,  sendMes(ToList,Message).
