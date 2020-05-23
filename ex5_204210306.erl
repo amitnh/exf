@@ -43,5 +43,5 @@ atomToNum(Atom)->list_to_integer(string:substr(atom_to_list(Atom),5)).
 node_loop_master(ToList,C)->aaa.
 
 %send the message to all the members in lists
-sendMes([],Message)-> io:format("Message: \"~f\" sent.~n", [Message]);
+sendMes([],Message)-> io:format("Message: ~p sent from: ~p ~n", [Message,self()]);
 sendMes([H|ToList],Message)-> H ! Message,  sendMes(ToList,Message).
