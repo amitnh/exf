@@ -58,8 +58,12 @@ node_loop(ToList,C,History)->
 %----------------------------------------------------------------------------
 %----------------------------------------------------------------------------
 %send the message to all the members in lists
-sendMes([],_)-> io:format(""); %io:format("Message: ~p sent from: ~p to all ~n", [Message,pidToRegName(self())]);
-sendMes([H|ToList],Message)-> H ! {self(),H,Message},io:format("Message: ~p sent from: ~p to: ~p ~n", [Message,pidToRegName(self()),[H]]),  sendMes(ToList,Message).
+sendMes([],_)-> void; %io:format("Message: ~p sent from: ~p to all ~n", [Message,pidToRegName(self())]);
+sendMes([H|ToList],Message)->IsRegName = lists:member(H,registered()),
+  if IsRegName -> H ! {self(),H,Message},io:format("Message: ~p sent from: ~p to: ~p ~n", [Message,pidToRegName(self()),[H]]),  sendMes(ToList,Message); %check if H not closed yet
+    true -> sendMes(ToList,Message)
+end.
+
 
 %gets the RegName from the Pid, for example:      <0.78.0> ---> [node4]
 pidToRegName(Pid)-> [Y ||{registered_name,Y}<-process_info(Pid)].
@@ -102,7 +106,7 @@ mesh_parallel(_,_,_)-> badArguments.
 
 mesh_parallel(N,0,M,C) -> node_loop_master_mesh(getNeighborsMesh(C,N),[],M,0,0,N*M,os:timestamp()); %mesh master does that- number C
 mesh_parallel(N,C,M,C) -> io:format("skipped node~p ~n",[C]),mesh_parallel(N,C-1,M,C); % skip building C
-mesh_parallel(N,I,M,C) -> register(numToAtom(I),spawn(fun()->node_loop([getNeighborsMesh(I,N)],I,[]) end)),io:format("build node~p ~n",[I]),mesh_parallel(N,I-1,M,C). % makes N processes node1,node2,...,nodeN.
+mesh_parallel(N,I,M,C) -> register(numToAtom(I),spawn(fun()->node_loop(getNeighborsMesh(I,N),I,[]) end)),io:format("build node~p ~n",[I]),mesh_parallel(N,I-1,M,C). % makes N processes node1,node2,...,nodeN.
 
 %get the neighbors list, gets the N and the index I,
 % return list of neighbors nodes for example: getneighborsMesh(2,10)-> [node1,node3,node12]
@@ -110,18 +114,22 @@ getNeighborsMesh(I,N)-> Col= I rem N, Line = I div N,
   Neighbors= [Line*N + Col-1,Line*N + Col+1,(Line+1)*N + Col,(Line-1)*N + Col], % left, right,down, up
   [numToAtom(X)||X<-Neighbors,X>0,X<(N*N)+1]. %taking only the neighbors that exists between 1-N^2
 
+getAllNodes(N)-> [numToAtom(X)||X<-lists:seq(1, N*N)].
 
 %sends M msgs
-node_loop_master_mesh(ToList,_,M,M,ToRecieve,ToRecieve,StartTime)-> sendMes(ToList,close),io:format("node1 recieved back all of the messages ~n"), %recieved all msgs
+node_loop_master_mesh(ToList,_,M,M,ToRecieve,ToRecieve,StartTime)-> sendMes(getAllNodes(ToRecieve div M),close),io:format("node1 recieved back all of the messages ~n"), %recieved all msgs
   receive
-    {_,_,close} -> io:format("[node1] and All other processes are closed ~n"),
-      io:format("Total Time of Function: ~f miliseconds~n", [timer:now_diff(os:timestamp(), StartTime) / 1000]), {timer:now_diff(os:timestamp(), StartTime),M,M}%waits for the {close} message back
+    {_,_,close} -> io:format("C and All other processes are closed ~n"),
+      io:format("Total Time of Function: ~f miliseconds~n", [timer:now_diff(os:timestamp(), StartTime) / 1000]), {timer:now_diff(os:timestamp(), StartTime),M,M};%waits for the {close} message back
+    _ -> node_loop_master_mesh(ToList,ToList,M,M,ToRecieve,ToRecieve,StartTime)
   end;
-node_loop_master_mesh(ToList,History,M,M,Recieved,ToRecieve,StartTime)->
+node_loop_master_mesh(ToList,History,M,M,Recieved,ToRecieve,StartTime)-> %wating to recieve all the msgs back
   receive
-    {_,_,close} -> io:format("[node1] and All other processes are closed ~n"),
+    {_,_,close} -> io:format("C and All other processes are closed ~n"),
       io:format("Total Time of Function: ~f miliseconds~n", [timer:now_diff(os:timestamp(), StartTime) / 1000]), {timer:now_diff(os:timestamp(), StartTime),M,Recieved};
     {_,_,Msg} when is_integer(Msg) -> node_loop_master_mesh(ToList,History,M,M,Recieved+1,ToRecieve,StartTime); % 1st time i receieved this msg
-    _-> node_loop_master_mesh(ToList,History,M,M,Recieved,ToRecieve,StartTime)
+    _ -> node_loop_master_mesh(ToList,History,M,M,Recieved,ToRecieve,StartTime)
   end;
 node_loop_master_mesh(ToList,History,M,Sent,Recieved,ToRecieve,StartTime)-> sendMes(ToList, Sent),node_loop_master_mesh(ToList,History,M,Sent+1,Recieved,ToRecieve,StartTime).
+
+
