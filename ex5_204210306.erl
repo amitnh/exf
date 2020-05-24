@@ -59,8 +59,8 @@ node_loop(ToList,C,History)->
 %----------------------------------------------------------------------------
 %send the message to all the members in lists
 sendMes([],_)-> void; %io:format("Message: ~p sent from: ~p to all ~n", [Message,pidToRegName(self())]);
-sendMes([H|ToList],Message)->IsRegName = lists:member(H,registered()),
-  if IsRegName -> H ! {self(),H,Message},  sendMes(ToList,Message); %check if H not closed yet
+sendMes([H|ToList],Message)->IsRegName = lists:member(H,registered()), MyName= pidToRegName(self()),
+  if IsRegName and (H /= MyName) -> H ! {self(),H,Message},  sendMes(ToList,Message); %check if H not closed yet
   %,io:format("Message: ~p sent from: ~p to: ~p ~n", [Message,pidToRegName(self()),[H]])
     true -> sendMes(ToList,Message)
 end.
@@ -118,7 +118,7 @@ getNeighborsMesh(I,N)-> Col= I rem N, Line = I div N,
 getAllNodes(N)-> [numToAtom(X)||X<-lists:seq(1, N*N)].
 
 %sends M msgs
-node_loop_master_mesh(ToList,_,M,M,ToRecieve,ToRecieve,StartTime)-> sendMes(getAllNodes(ToRecieve div M),close),io:format("node1 recieved back all of the messages ~n"), %recieved all msgs
+node_loop_master_mesh(ToList,_,M,M,ToRecieve,ToRecieve,StartTime)-> sendMes(getAllNodes(ToRecieve div M),close), %recieved all msgs
   receive
     {_,_,close} -> io:format("C and All other processes are closed ~n"),
       io:format("Total Time of Function: ~f miliseconds~n", [timer:now_diff(os:timestamp(), StartTime) / 1000]), {timer:now_diff(os:timestamp(), StartTime),M,M};%waits for the {close} message back
