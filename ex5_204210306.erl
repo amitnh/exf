@@ -47,9 +47,9 @@ node_loop(ToList,C,History)->
   receive
     %{addToList,Pid} -> node_loop(ToList ++ [Pid],C,History);
     {_,_,close} -> sendMes(ToList,close),io:format("~p is closed ~n",[pidToRegName(self())]);
-    {_,_,Message}-> IsMember= lists:member({C, Message},History), %check if ive send that msg in the past
+    {From,_,Message}-> IsMember= lists:member({From, Message},History), %check if ive send that msg in the past
       if
-        not IsMember-> sendMes(ToList, Message),node_loop(ToList,C,History++[{C, Message}]); % 1st time i receieved this msg
+        not IsMember-> sendMes(ToList, Message),node_loop(ToList,C,History++[{From, Message}]); % 1st time i receieved this msg
         true-> node_loop(ToList,C,History) %iv'e already recieved this msg
       end;
     _-> node_loop(ToList,C,History)
@@ -60,7 +60,8 @@ node_loop(ToList,C,History)->
 %send the message to all the members in lists
 sendMes([],_)-> void; %io:format("Message: ~p sent from: ~p to all ~n", [Message,pidToRegName(self())]);
 sendMes([H|ToList],Message)->IsRegName = lists:member(H,registered()),
-  if IsRegName -> H ! {self(),H,Message},io:format("Message: ~p sent from: ~p to: ~p ~n", [Message,pidToRegName(self()),[H]]),  sendMes(ToList,Message); %check if H not closed yet
+  if IsRegName -> H ! {self(),H,Message},  sendMes(ToList,Message); %check if H not closed yet
+  %,io:format("Message: ~p sent from: ~p to: ~p ~n", [Message,pidToRegName(self()),[H]])
     true -> sendMes(ToList,Message)
 end.
 
@@ -101,12 +102,12 @@ ring_serial(Me,V,Sent,M,StartTime) -> self() ! {Me,Me+1,Sent+1}
 %----------------------------------------------------------------------------
 
 mesh_parallel(1,M,C)-> chooseNBiggerThen1;
-mesh_parallel(N,M,C) when is_integer(N) and is_integer(M) and is_integer(C) and (C>0) and (C<N*N) ->register(numToAtom(C),spawn(fun()->mesh_parallel(N,N*N,M,C) end));
+mesh_parallel(N,M,C) when is_integer(N) and is_integer(M) and is_integer(C) and (C>0) and (C<N*N +1) ->register(numToAtom(C),spawn(fun()->mesh_parallel(N,N*N,M,C) end));
 mesh_parallel(_,_,_)-> badArguments.
 
 mesh_parallel(N,0,M,C) -> node_loop_master_mesh(getNeighborsMesh(C,N),[],M,0,0,N*M,os:timestamp()); %mesh master does that- number C
-mesh_parallel(N,C,M,C) -> io:format("skipped node~p ~n",[C]),mesh_parallel(N,C-1,M,C); % skip building C
-mesh_parallel(N,I,M,C) -> register(numToAtom(I),spawn(fun()->node_loop(getNeighborsMesh(I,N),I,[]) end)),io:format("build node~p ~n",[I]),mesh_parallel(N,I-1,M,C). % makes N processes node1,node2,...,nodeN.
+mesh_parallel(N,C,M,C) -> mesh_parallel(N,C-1,M,C); % skip building C %io:format("skipped node~p ~n",[C]),
+mesh_parallel(N,I,M,C) -> register(numToAtom(I),spawn(fun()->node_loop(getNeighborsMesh(I,N),I,[]) end)),mesh_parallel(N,I-1,M,C). % makes N processes node1,node2,...,nodeN. %,io:format("build node~p ~n",[I])
 
 %get the neighbors list, gets the N and the index I,
 % return list of neighbors nodes for example: getneighborsMesh(2,10)-> [node1,node3,node12]
