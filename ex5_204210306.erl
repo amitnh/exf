@@ -17,20 +17,25 @@ ring_parallel(N,M) when is_integer(N) and is_integer(M)-> register(node1,spawn(f
 ring_parallel(_,_)-> badArguments.
 
 %if N<2 !@@@@@@@@@@@@@@@@@!@!@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-ring_parallel(_,1,M,_) -> node_loop_master([node2],[],M,M,os:timestamp()); %close the loop : node1---->node2
+ring_parallel(_,1,M,_) -> node_loop_master([node2],[],M,0,0,os:timestamp()); %close the loop : node1---->node2
 ring_parallel(N,I,M,Last) -> register(Node=numToAtom(I),spawn(fun()->node_loop([Last],1,[]) end)),ring_parallel(N,I-1,M,Node). % makes N processes node1,node2,...,nodeN.
 
 
 
 %sends M msgs
-node_loop_master(ToList,History,0,0,StartTime)-> sendMes(ToList,close),io:format("node1 recieved back all of the messages ~n"),node_loop_master(ToList,History,0,1,StartTime); %waits for the {close} message back
-node_loop_master(ToList,History,0,Recieved,StartTime)-> receive
-                                       {From,To,close} -> io:format("[node1] and All other processes are closed ~n"),
-                                         io:format("Total Time of Function: ~f miliseconds~n", [timer:now_diff(os:timestamp(), StartTime) / 1000]);
-                                       {From,To,M} when is_integer(M) -> node_loop_master(ToList,History,0,Recieved-1,StartTime); % 1st time i receieved this msg
-                                       _-> node_loop_master(ToList,History,0,Recieved,StartTime)
-                                     end;
-node_loop_master(ToList,History,M,Recieved,StartTime)-> sendMes(ToList, M),node_loop_master(ToList,History,M-1,Recieved,StartTime).
+node_loop_master(ToList,_,M,M,M,StartTime)-> sendMes(ToList,close),io:format("node1 recieved back all of the messages ~n"), %recieved all msgs
+      receive
+        {From,To,close} -> io:format("[node1] and All other processes are closed ~n"),
+          io:format("Total Time of Function: ~f miliseconds~n", [timer:now_diff(os:timestamp(), StartTime) / 1000]), {timer:now_diff(os:timestamp(), StartTime),M,M}%waits for the {close} message back
+      end;
+node_loop_master(ToList,History,M,M,Recieved,StartTime)->
+      receive
+         {From,To,close} -> io:format("[node1] and All other processes are closed ~n"),
+           io:format("Total Time of Function: ~f miliseconds~n", [timer:now_diff(os:timestamp(), StartTime) / 1000]), {timer:now_diff(os:timestamp(), StartTime),M,Recieved};
+         {From,To,Msg} when is_integer(Msg) -> node_loop_master(ToList,History,M,M,Recieved+1,StartTime); % 1st time i receieved this msg
+         _-> node_loop_master(ToList,History,M,M,Recieved,StartTime)
+       end;
+node_loop_master(ToList,History,M,Sent,Recieved,StartTime)-> sendMes(ToList, Sent),node_loop_master(ToList,History,M,Sent+1,Recieved,StartTime).
 
 %node_loop- each process is a node
 % ToList - list of nodes to send to
