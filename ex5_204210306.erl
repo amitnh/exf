@@ -44,21 +44,28 @@ node_loop_master(ToList,History,M,Sent,Recieved,StartTime)-> sendMes(ToList, {pi
 % C- unique number
 %History- list of messages history: [{C,Message1},{C,Message2},...]
 node_loop(ToList,C,History)->
-  receive
-    %{addToList,Pid} -> node_loop(ToList ++ [Pid],C,History);
-    {_,_,close} -> sendMes(ToList,close),io:format("~p is closed ~n",[pidToRegName(self())]);
-    {_,_, {Atom,Message}}-> IsMember= lists:member({Atom, Message},History), %check if ive send that msg in the past
-      if
-        not IsMember->% 1st time i receieved this msg
-           if Atom =:= master -> sendMes(ToList, {master,Message}),% if its from the master %passing the masters msg
-                                 sendMes(ToList, {pidToRegName(self()),Message}), %passing a unique response
-                                 node_loop(ToList,C,History++[{master, Message}]++[{pidToRegName(self()),Message}]); %adding to history msgs
-              true ->  sendMes(ToList, {Atom,Message}),%case atom is not master just pass it
-                       node_loop(ToList,C,History++[{Atom,Message}]) %adding to history msgs
-              end;
-        true-> node_loop(ToList,C,History) %iv'e already recieved this msg
-      end;
-    _-> node_loop(ToList,C,History)
+  receive %prioritize close
+    {_,_,close} -> sendMes(ToList,close); %for the ring use
+    {_,_,{master,close}}->io:format("~p is closed ~n",[pidToRegName(self())])
+  after 0 ->
+    receive
+      %{addToList,Pid} -> node_loop(ToList ++ [Pid],C,History);
+      {_,_,close} -> sendMes(ToList,close),io:format("~p is closed ~n",[pidToRegName(self())]); %for the ring use
+      {_,_,{master,close}}->io:format("~p is closed ~n",[pidToRegName(self())]); % for mesh grid use
+      {_,_, {Atom,Message}}-> IsMember= lists:member({Atom, Message},History), %check if ive send that msg in the past
+        if
+          not IsMember->% 1st time i receieved this msg
+             if Atom =:= master -> sendMes(ToList, {master,Message}),% if its from the master %passing the masters msg
+                                   sendMes(ToList, {pidToRegName(self()),Message}), %passing a unique response
+                                   node_loop(ToList,C,History++[{master, Message}]++[{pidToRegName(self()),Message}]); %adding to history msgs
+                true ->
+                         sendMes(ToList, {Atom,Message}),%case atom is not master just pass it
+                         node_loop(ToList,C,History++[{Atom,Message}]) %adding to history msgs
+                end;
+          true-> node_loop(ToList,C,History) %iv'e already received this msg
+        end;
+      _-> node_loop(ToList,C,History)
+    end
   end.
 %----------------------------------------------------------------------------
 %----------------------------------------------------------------------------
@@ -98,7 +105,7 @@ ring_serial(_,V,M,M,StartTime)->
                          _ -> error
                        end;
 ring_serial(Me,V,Sent,M,StartTime) -> self() ! {Me,Me+1,Sent+1}
-  ,io:format("Message: ~p sent from: vertex~p to: vertex~p ~n", [Sent,Me,Me+1])
+  %,io:format("Message: ~p sent from: vertex~p to: vertex~p ~n", [Sent,Me,Me+1])
   ,ring_serial(Me,V,Sent+1,M,StartTime).
 %----------------------------------------------------------------------------
 %----------------------------------------------------------------------------
@@ -111,8 +118,8 @@ mesh_parallel(1,_,_)-> chooseNBiggerThen1;
 mesh_parallel(N,M,C) when is_integer(N) and is_integer(M) and is_integer(C) and (C>0) and (C<N*N +1) ->register(numToAtom(C),spawn(fun()->mesh_parallel(N,N*N,M,C) end));
 mesh_parallel(_,_,_)-> badArguments.
 
-mesh_parallel(N,0,M,C) -> node_loop_master_mesh(getNeighborsMesh(C,N),[],M,0,0,(N*N-1)*M,os:timestamp()); %mesh master does that- number C
-mesh_parallel(N,C,M,C) -> mesh_parallel(N,C-1,M,C); % skip building C %io:format("skipped node~p ~n",[C]),
+mesh_parallel(N,0,M,C) -> node_loop_master_mesh(getNeighborsMesh(C,N),[],M,0,0,(((N*N)-1)*M),os:timestamp()); %mesh master does that- number C
+mesh_parallel(N,C,M,C) -> mesh_parallel(N,C-1,M,C); % skip building C
 mesh_parallel(N,I,M,C) -> register(numToAtom(I),spawn(fun()->node_loop(getNeighborsMesh(I,N),I,[]) end)),mesh_parallel(N,I-1,M,C). % makes N processes node1,node2,...,nodeN. %,io:format("build node~p ~n",[I])
 
 %get the neighbors list, gets the N and the index I,
@@ -123,20 +130,29 @@ getNeighborsMesh(I,N)-> Col= I rem N, Line = I div N,
 
 getAllNodes(N)-> [numToAtom(X)||X<-lists:seq(1, N*N)].
 
+
 %sends M msgs
-node_loop_master_mesh(ToList,_,M,M,ToRecieve,ToRecieve,StartTime)-> sendMes(getAllNodes((ToRecieve div M) +1),close), %recieved all msgs
-  receive
-    {_,_,close} -> io:format("C and All other processes are closed ~n"),
-      io:format("Total Time of Function: ~f miliseconds~n", [timer:now_diff(os:timestamp(), StartTime) / 1000]), {timer:now_diff(os:timestamp(), StartTime),M,M};%waits for the {close} message back
-    _ -> node_loop_master_mesh(ToList,ToList,M,M,ToRecieve,ToRecieve,StartTime)
-  end;
+node_loop_master_mesh(ToList,_,M,M,ToRecieve,ToRecieve,StartTime)-> sendMes(getAllNodes((ToRecieve div M) +1) -- [pidToRegName(self())], {master,close}), %recieved all msgs getAllNodes((ToRecieve div M) +1) -- [pidToRegName(self())]
+     EndTime=os:timestamp(), io:format("Total Time of Function: ~f miliseconds~n", [timer:now_diff(EndTime, StartTime) / 1000]), {timer:now_diff(EndTime, StartTime),M,M};%waits for the {close} message back  sleep(2000),unregisterAll((ToRecieve div M))
+
 node_loop_master_mesh(ToList,History,M,M,Recieved,ToRecieve,StartTime)-> %wating to recieve all the msgs back
   receive
     {_,_,close} -> io:format("C and All other processes are closed ~n"),
       io:format("Total Time of Function: ~f miliseconds~n", [timer:now_diff(os:timestamp(), StartTime) / 1000]), {timer:now_diff(os:timestamp(), StartTime),M,Recieved};
-    {_,_, {Atom,Msg}} when is_integer(Msg) and (Atom /= master) -> node_loop_master_mesh(ToList,History,M,M,Recieved+1,ToRecieve,StartTime); % 1st time i receieved this msg
+    {_,_, {master,_}}->node_loop_master_mesh(ToList,History,M,M,Recieved,ToRecieve,StartTime);
+      {_,_, {Atom,Message}}-> IsMember= lists:member({Atom, Message},History), %check if ive send that msg in the past
+                  if not IsMember ->% 1st time i receieved this msg
+                    node_loop_master_mesh(ToList,History++[{Atom, Message}],M,M,Recieved+1,ToRecieve,StartTime);
+                    true->node_loop_master_mesh(ToList,History,M,M,Recieved,ToRecieve,StartTime)
+                  end;
+
     _ -> node_loop_master_mesh(ToList,History,M,M,Recieved,ToRecieve,StartTime)
   end;
 node_loop_master_mesh(ToList,History,M,Sent,Recieved,ToRecieve,StartTime)-> sendMes(ToList, {master,Sent}),node_loop_master_mesh(ToList,History,M,Sent+1,Recieved,ToRecieve,StartTime).
 
+unregisterAll([])->ok;
+unregisterAll([H|T])->IsMem= lists:member(H,registered()), if IsMem-> unregister(H),io:format("~p, ",[H]); true->unregisterAll(T) end;
+unregisterAll(N)-> unregisterAll([X||X<-lists:seq(1, N*N)]).
+
+sleep(T)-> receive after T->ok end.
 
