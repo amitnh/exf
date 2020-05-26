@@ -158,7 +158,7 @@ mesh_serial(N,M,C) when is_integer(N) and is_integer(M) and (C>0) and (C<N*N+1) 
   spawn(fun() ->
   mesh_serial(N,C,0,M,
     ((N*N)-1)*M, % ToReceive
-    [[]||_<-lists:seq(1, N*N)], %N*N empty lists in a list. for History
+    [[]||_<-lists:seq(1,(N*N))], %N*N empty lists in a list. for History
     os:timestamp())
         end); %
 mesh_serial(_,_,_)->badArguments.
@@ -176,13 +176,13 @@ mesh_serial(N,C,M,M,ToReceive,History,StartTime)-> io:format("recieve ~n"),
                       io:format("~p -> master ~p ~n",[X,Msg]),
                                       [self() ! {X,Y,Msg} ||Y<-Neighbors], %new msg
                       io:format("~p -> ~p ~n",[X,Msg]),
-                                      mesh_serial(N,C,M,M,ToReceive,lists:nth(X,History)++[{master,X,Msg}],StartTime);
+                                      mesh_serial(N,C,M,M,ToReceive,updateHistory(updateHistory(History,X,{master,X,Msg}),X,{X,Msg}),StartTime);
                       true-> mesh_serial(N,C,M,M,ToReceive,History,StartTime)
                     end;
     {Z,C,Msg}->  io:format("{~p,~p,~p} ~n",[Z,C,Msg]),
       List= lists:nth(C,History),
                 IsMember = lists:member({Z,Msg},List), %normal msg, pass it if u havent yet
-                if not IsMember -> mesh_serial(N,C,M,M,ToReceive-1,lists:nth(C,History)++[{Z,Msg}],StartTime); %recieved a new msg
+                if not IsMember -> mesh_serial(N,C,M,M,ToReceive-1,updateHistory(History,C,{Z,Msg}),StartTime); %recieved a new msg
                 true-> mesh_serial(N,C,M,M,ToReceive,History,StartTime) %recieved a old msg
                 end;
     {Z,X,Msg}-> io:format("{~p,~p,~p} ~n",[Z,X,Msg]),
@@ -190,14 +190,21 @@ mesh_serial(N,C,M,M,ToReceive,History,StartTime)-> io:format("recieve ~n"),
                   if not IsMember ->Neighbors=[atomToNum(Y)||Y<-getNeighborsMesh(X,N)], [self() ! {Z,Y,Msg} ||Y<-Neighbors], %first time to receive msg
                     [self() ! {Z,Y,Msg} ||Y<-Neighbors],
                     io:format("~p -> ~p ~n",[Z,Msg]),
-                    mesh_serial(N,C,M,M,ToReceive,lists:nth(X,History)++[{Z,Msg}],StartTime);
+                    mesh_serial(N,C,M,M,ToReceive,updateHistory(History,X,{Z,Msg}),StartTime);
                     true-> mesh_serial(N,C,M,M,ToReceive,History,StartTime)
                   end;
-
     _ -> error
   end;
+
+
+
 mesh_serial(N,C,I,M,ToReceive,History,StartTime) ->
 Neighbors=[atomToNum(X)||X<-getNeighborsMesh(C,N)], %list of numbers of neighbors: [2,5,3,7].
   [self() ! {master,X,I} ||X<-Neighbors],% send a Msg to each Neighbors
   io:format("Master: ~p ~n",[I]),
             mesh_serial(N,C,I+1,M,ToReceive,History,StartTime). % recursion
+
+
+%insert Msg to the History Matrix
+updateHistory(History,I,ToAdd)->IHis= lists:nth(I,History) ++ [ToAdd],
+  lists:sublist(History,I) ++ IHis ++ lists:nthtail(I+1,History).
