@@ -169,7 +169,7 @@ mesh_serial(_,_,M,M,0,_,StartTime)->io:format("Total Time of Function: ~f milise
 mesh_serial(N,C,M,M,ToReceive,History,StartTime)-> io:format("recieve ~n"),
   receive
     {master,X,Msg}->  io:format("{master,~p,~p} ~n",[X,Msg]),
-      List=lists:nth(X,History),
+      List=[lists:nth(X,History)], io:format("List ~p ~n",[List]),
               IsMember = lists:member({master,X,Msg},List), %master msg
                     if not IsMember ->Neighbors=[atomToNum(Y)||Y<-getNeighborsMesh(X,N)]--[C], %first time to receive msg
                                       [self() ! {master,Y,Msg} ||Y<-Neighbors], %pass the master
@@ -180,13 +180,13 @@ mesh_serial(N,C,M,M,ToReceive,History,StartTime)-> io:format("recieve ~n"),
                       true-> mesh_serial(N,C,M,M,ToReceive,History,StartTime)
                     end;
     {Z,C,Msg}->  io:format("{~p,~p,~p} ~n",[Z,C,Msg]),
-      List= lists:nth(C,History),
+      List= [lists:nth(C,History)],
                 IsMember = lists:member({Z,Msg},List), %normal msg, pass it if u havent yet
                 if not IsMember -> mesh_serial(N,C,M,M,ToReceive-1,updateHistory(History,C,{Z,Msg}),StartTime); %recieved a new msg
                 true-> mesh_serial(N,C,M,M,ToReceive,History,StartTime) %recieved a old msg
                 end;
     {Z,X,Msg}-> io:format("{~p,~p,~p} ~n",[Z,X,Msg]),
-      IsMember = lists:member({Z,Msg},lists:nth(X,History)), %normal msg, pass it if u havent yet
+      IsMember = lists:member({Z,Msg},[lists:nth(X,History)]), %normal msg, pass it if u havent yet
                   if not IsMember ->Neighbors=[atomToNum(Y)||Y<-getNeighborsMesh(X,N)], [self() ! {Z,Y,Msg} ||Y<-Neighbors], %first time to receive msg
                     [self() ! {Z,Y,Msg} ||Y<-Neighbors],
                     io:format("~p -> ~p ~n",[Z,Msg]),
@@ -206,5 +206,5 @@ Neighbors=[atomToNum(X)||X<-getNeighborsMesh(C,N)], %list of numbers of neighbor
 
 
 %insert Msg to the History Matrix
-updateHistory(History,I,ToAdd)->IHis= lists:nth(I,History) ++ [ToAdd],
+updateHistory(History,I,ToAdd)->IHis= [lists:nth(I,History)] ++ [ToAdd],
   lists:sublist(History,I) ++ IHis ++ lists:nthtail(I+1,History).
