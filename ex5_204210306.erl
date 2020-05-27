@@ -25,7 +25,7 @@ ring_parallel(N,I,M,Last) -> register(Node=numToAtom(I),spawn(fun()->node_loop([
 
 
 %sends M msgs
-node_loop_master(ToList,_,M,M,M,StartTime)-> sendMes(ToList,close),io:format("node1 recieved back all of the messages ~n"), %recieved all msgs
+node_loop_master(ToList,_,M,M,M,StartTime)-> sendMes(ToList,close), %recieved all msgs
       receive
         {_,_,close} -> io:format("[node1] and All other processes are closed ~n"),
           io:format("Total Time of Function: ~f miliseconds~n", [timer:now_diff(os:timestamp(), StartTime) / 1000]), {timer:now_diff(os:timestamp(), StartTime),M,M}%waits for the {close} message back
@@ -46,12 +46,12 @@ node_loop_master(ToList,History,M,Sent,Recieved,StartTime)-> sendMes(ToList, {pi
 node_loop(ToList,C,History)->
   receive %prioritize close
     {_,_,close} -> sendMes(ToList,close); %for the ring use
-    {_,_,{master,close}}->io:format("~p is closed ~n",[pidToRegName(self())])
+    {_,_,{master,close}}->io:format("")
   after 0 ->
     receive
       %{addToList,Pid} -> node_loop(ToList ++ [Pid],C,History);
-      {_,_,close} -> sendMes(ToList,close),io:format("~p is closed ~n",[pidToRegName(self())]); %for the ring use
-      {_,_,{master,close}}->io:format("~p is closed ~n",[pidToRegName(self())]); % for mesh grid use
+      {_,_,close} -> sendMes(ToList,close); %for the ring close use
+      {_,_,{master,close}}->io:format(""); % for mesh grid close use
       {_,_, {Atom,Message}}-> IsMember= lists:member({Atom, Message},History), %check if ive send that msg in the past
         if
           not IsMember->% 1st time i receieved this msg
@@ -132,7 +132,7 @@ getAllNodes(N)-> [numToAtom(X)||X<-lists:seq(1, N*N)].
 
 
 %sends M msgs
-node_loop_master_mesh(ToList,_,M,M,ToRecieve,ToRecieve,StartTime)-> sendMes(getAllNodes((ToRecieve div M) +1) -- [pidToRegName(self())], {master,close}), %recieved all msgs getAllNodes((ToRecieve div M) +1) -- [pidToRegName(self())]
+node_loop_master_mesh(_,_,M,M,ToRecieve,ToRecieve,StartTime)-> sendMes(getAllNodes((ToRecieve div M) +1) -- [pidToRegName(self())], {master,close}), %recieved all msgs getAllNodes((ToRecieve div M) +1) -- [pidToRegName(self())]
      EndTime=os:timestamp(), io:format("Total Time of Function: ~f miliseconds~n", [timer:now_diff(EndTime, StartTime) / 1000]), {timer:now_diff(EndTime, StartTime),M,M};%waits for the {close} message back  sleep(2000),unregisterAll((ToRecieve div M))
 
 node_loop_master_mesh(ToList,History,M,M,Recieved,ToRecieve,StartTime)-> %wating to recieve all the msgs back
@@ -166,30 +166,30 @@ mesh_serial(_,_,_)->badArguments.
 
 %history is map N*N maps for each vertex
 mesh_serial(_,_,M,M,0,_,StartTime)->io:format("Total Time of Function: ~f miliseconds~n", [timer:now_diff(os:timestamp(), StartTime) / 1000]), {timer:now_diff(os:timestamp(), StartTime),M,M}; % if im the last msg
-mesh_serial(N,C,M,M,ToReceive,History,StartTime)-> io:format("recieve ~n"),
+mesh_serial(N,C,M,M,ToReceive,History,StartTime)->
   receive
-    {master,X,Msg}->  io:format("{master,~p,~p} ~n",[X,Msg]),
-      List=[lists:nth(X,History)], io:format("List ~p ~n",[List]),
+    {master,X,Msg}->
+      List=[lists:nth(X,History)],
               IsMember = lists:member({master,X,Msg},List), %master msg
                     if not IsMember ->Neighbors=[atomToNum(Y)||Y<-getNeighborsMesh(X,N)]--[C], %first time to receive msg
                                       [self() ! {master,Y,Msg} ||Y<-Neighbors], %pass the master
-                      io:format("~p -> master ~p ~n",[X,Msg]),
+
                                       [self() ! {X,Y,Msg} ||Y<-Neighbors], %new msg
-                      io:format("~p -> ~p ~n",[X,Msg]),
+
                                       mesh_serial(N,C,M,M,ToReceive,updateHistory(updateHistory(History,X,{master,X,Msg}),X,{X,Msg}),StartTime);
                       true-> mesh_serial(N,C,M,M,ToReceive,History,StartTime)
                     end;
-    {Z,C,Msg}->  io:format("{~p,~p,~p} ~n",[Z,C,Msg]),
+    {Z,C,Msg}->
       List= [lists:nth(C,History)],
                 IsMember = lists:member({Z,Msg},List), %normal msg, pass it if u havent yet
                 if not IsMember -> mesh_serial(N,C,M,M,ToReceive-1,updateHistory(History,C,{Z,Msg}),StartTime); %recieved a new msg
                 true-> mesh_serial(N,C,M,M,ToReceive,History,StartTime) %recieved a old msg
                 end;
-    {Z,X,Msg}-> io:format("{~p,~p,~p} ~n",[Z,X,Msg]),
+    {Z,X,Msg}->
       IsMember = lists:member({Z,Msg},[lists:nth(X,History)]), %normal msg, pass it if u havent yet
                   if not IsMember ->Neighbors=[atomToNum(Y)||Y<-getNeighborsMesh(X,N)], [self() ! {Z,Y,Msg} ||Y<-Neighbors], %first time to receive msg
                     [self() ! {Z,Y,Msg} ||Y<-Neighbors],
-                    io:format("~p -> ~p ~n",[Z,Msg]),
+
                     mesh_serial(N,C,M,M,ToReceive,updateHistory(History,X,{Z,Msg}),StartTime);
                     true-> mesh_serial(N,C,M,M,ToReceive,History,StartTime)
                   end;
@@ -201,7 +201,7 @@ mesh_serial(N,C,M,M,ToReceive,History,StartTime)-> io:format("recieve ~n"),
 mesh_serial(N,C,I,M,ToReceive,History,StartTime) ->
 Neighbors=[atomToNum(X)||X<-getNeighborsMesh(C,N)], %list of numbers of neighbors: [2,5,3,7].
   [self() ! {master,X,I} ||X<-Neighbors],% send a Msg to each Neighbors
-  io:format("Master: ~p ~n",[I]),
+
             mesh_serial(N,C,I+1,M,ToReceive,History,StartTime). % recursion
 
 
