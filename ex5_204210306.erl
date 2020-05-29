@@ -28,7 +28,7 @@ flush() -> receive _ ->flush() after 0 -> ok end.
 %sends M msgs
 node_loop_master(ToList,_,M,M,M,StartTime)-> sendMes(ToList,close), %recieved all msgs
       receive
-        {_,_,close} -> io:format("[node1] and All other processes are closed ~n"),
+        {_,_,close} -> flush(),
           io:format("Total Time of Function: ~f miliseconds~n", [Time=timer:now_diff(os:timestamp(), StartTime) / 1000]), {Time,M,M}%waits for the {close} message back
       end;
 node_loop_master(ToList,History,M,M,Recieved,StartTime)->
@@ -46,8 +46,8 @@ node_loop_master(ToList,History,M,Sent,Recieved,StartTime)-> sendMes(ToList, {pi
 %History- list of messages history: [{C,Message1},{C,Message2},...]
 node_loop(ToList,C,History)->
   receive %prioritize close
-    {_,_,close} -> sendMes(ToList,close); %for the ring use
-    {_,_,{master,close}}->io:format("")
+    {_,_,close} -> sendMes(ToList,close),flush(); %for the ring use
+    {_,_,{master,close}}->flush()
   after 0 ->
     receive
       %{addToList,Pid} -> node_loop(ToList ++ [Pid],C,History);
