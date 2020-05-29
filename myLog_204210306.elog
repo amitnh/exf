@@ -1,0 +1,13 @@
+{{{2020,5,29},{16,6,30}},error,{badfun,2.5}} 
+{{{2020,5,29},{16,6,58}},error,{badfun,divisionByZero}} 
+{{{2020,5,29},{16,7,35}},error,{badfun,2.5}} 
+{1590761646,error,{badfun,3.0}} 
+{1590761652,error,{badfun,{1590761652,error,divisionByZero,badarith}}} 
+{1590761720,success,{1590761720,error,divisionByZero,badarith}} 
+{1590761732,success,3.0} 
+{1590761736,success,2.0} 
+{1590761740,success,6.0} 
+{1590761743,success,1.2} 
+{1590761746,success,{1590761746,error,divisionByZero,badarith}} 
+{1590761747,success,{1590761747,error,divisionByZero,badarith}} 
+{1590761748,success,{1590761748,error,divisionByZero,badarith}} 
