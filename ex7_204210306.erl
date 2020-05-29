@@ -39,6 +39,6 @@ calc(division,A,B)->try A/B of
                       Val-> Val %case of success
                     catch
                       %case of failure {time,Exceptione, divisionByZero,E}
-                      Exceptione:E -> {os:system_time(second),Exceptione, divisionByZero,E} % case of exaption
+                      Exception:E -> {os:system_time(second),Exception, divisionByZero,E} % case of exaption
                     end;
 calc(_,_,_)-> badArgs.
