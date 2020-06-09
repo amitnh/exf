@@ -10,35 +10,72 @@
 
 
 %% API
--export([steady/1,calc/3]).
+-export([startChat/1,call/1,send/1]).
 %---------------------------------------------------------------
-% steady(F):
-% takes a function F() and trys to run it.
-% in either way, success or failue, it will be written to myLog_204210306.elog with a time stamp
+%%startChat()->Pid
 %---------------------------------------------------------------
-steady(F) ->
-  file:open("myLog_204210306.elog",[write, append]),
-  try F() of
-    %case of success: {time, success, ReturnValue}
-    RetVal -> file:write_file("myLog_204210306.elog", io_lib:format("{~p,success,~p} ~n", [os:system_time(second), RetVal]), [append]),RetVal
-  catch
-    % case of error: {time, error, Error}
-    error:Error -> file:write_file("myLog_204210306.elog",io_lib:format("{~p,error,~p} ~n", [os:system_time(second), Error]), [append]),Error;
-    % case of exit: {time, exit, Exit}
-    exit:Exit -> file:write_file("myLog_204210306.elog",io_lib:format("{~p,exit,~p} ~n", [os:system_time(second), Exit]), [append]),Exit;
-    % case of trow: {time, throw, Throw}
-    throw:Throw -> file:write_file("myLog_204210306.elog",io_lib:format("{~p,throw,~p} ~n", [os:system_time(second), Throw]), [append]),Throw
+startChat(RemoteName@IP)->
+  register(remoteProcessPID, Pid_Local_Sender = spawn(fun() -> loop(RemoteName@IP, 0, 0) end)),
+  rpc:call(RemoteName@IP, ex8_204210306, addToChat, [node()]),
+  put(remoteName@IP, RemoteName@IP),   % Saves RemoteName@IP
+  Pid_Local_Sender. %returns the pid
+
+addToChat(LocalName@IP) ->
+  % check if we already put it
+  case whereis(remoteProcessPID) of
+    undefined ->
+      register(remoteProcessPID, spawn(fun() -> remoteLoop(LocalName@IP, 0, 0) end));
+    _ -> io:format("chat already works")
   end.
 
-%---------------------------------------------------------------
-% calc(division,A,B):
-% trys to do A/B
-% it will fail when B=0, but we will catch the Error with the catch
-%---------------------------------------------------------------
-calc(division,A,B)->try A/B of
-                      Val-> Val %case of success
-                    catch
-                      %case of failure {time,Exceptione, divisionByZero,E}
-                      Exception:E -> {os:system_time(second),Exception, divisionByZero,E} % case of exaption
-                    end;
-calc(_,_,_)-> badArgs.
+send(Message) ->
+  remoteProcessPID ! Message.
+
+call(Message)->
+  rpc:call(get(remoteName@IP), ex8_204210306, send, [Message]).
+
+
+%% Aid function - block receive loop for the local process
+loop(RemoteName@IP, Sent, Received)->
+  receive
+    stats ->
+      io:format("Local stats: sent: ~p received: ~p~n", [Sent, Received]),
+      loop(RemoteName@IP, Sent, Received);
+
+    quit ->
+      % Send exit message to the remote process
+      {remoteProcessPID, RemoteName@IP} ! quit,
+      io:format("~p - Successfully closed.~n",[self()]),
+      exit(requested);
+
+    {fromRemote, Message} ->
+      Message,
+      %io:format("Local process recieved a message from Remote process : ~p ~n",[Message]),
+      loop(RemoteName@IP, Sent, Received + 1);
+
+    Message ->
+      {remoteProcessPID, RemoteName@IP} ! {fromLocal, Message},
+      %io:format("Local process recieved a message : ~p ~n",[Message]),
+      loop(RemoteName@IP, Sent + 1, Received)
+  end.
+
+
+%% Aid function - block receive loop for the remote process
+remoteLoop(LocalName@IP, SentIndex, ReceivedIndex) ->
+  receive
+    stats ->
+      io:format("remote stats: sent: ~p received: ~p~n", [SentIndex, ReceivedIndex]),
+      remoteLoop(LocalName@IP, SentIndex, ReceivedIndex);
+
+    quit->
+      io:format("~p - Successfully closed.~n",[self()]),
+      exit(requested);
+
+  % Receive of a message from the local process
+    {fromLocal, _}->
+      remoteLoop(LocalName@IP, SentIndex, ReceivedIndex + 1);
+
+    Message ->
+      {localProcessPID, LocalName@IP} ! {fromRemote, Message},
+      remoteLoop(LocalName@IP, SentIndex + 1, ReceivedIndex)
+  end.
