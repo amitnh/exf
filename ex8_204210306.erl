@@ -17,15 +17,15 @@
 startChat(RemoteName@IP)->
   case whereis(localPID) of
     undefined ->
-      register(localPID, Pid_Local_Sender = spawn(fun() -> loop(RemoteName@IP, 0, 0) end)),
-      rpc:call(RemoteName@IP, ex8_204210306, addToChat, [node()]),
+      register(localPID, Pid_Local_Sender = spawn(fun() -> loop(RemoteName@IP, 0, 0) end)), %spawn process for local
+      rpc:call(RemoteName@IP, ex8_204210306, remoteStartChat, [node()]), %call a function thats spawn process for remote
       put(remoteName@IP, RemoteName@IP),   % Saves RemoteName@IP
       Pid_Local_Sender; %returns the pid
     _ -> io:format("chat already works")
   end.
 
 
-addToChat(LocalName@IP) ->
+remoteStartChat(LocalName@IP) ->
   % check if we already put it
   case whereis(remotePID) of
     undefined ->
