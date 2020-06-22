@@ -1,6 +1,8 @@
-ordered_set
+set
 insert 1 [3,2,1]
 insert hello {7,{},1} p q
-lookup p hello
-delete q
+lookup hello p
+delete p
+delete p
+lookup hello p
 update hello world

@@ -69,13 +69,13 @@ update([Key,Value|T])->  LookUp = ets:lookup(botEts,Key),
 update(_)-> errorValue.
 
 delete([])-> ok;
-delete([Key|T])->  ets:delete(botEts,{Key}) , delete(T); % if its not there -> ignore
+delete([Key|T])->  ets:delete(botEts,Key) , delete(T); % if its not there -> ignore
 delete(_)-> error.
 
 lookup([])-> ok;
-lookup([Key|T])->  LookUp = ets:lookup(botEts,{Key}) , % if its not there -> ignore
+lookup([Key|T])->  LookUp = ets:lookup(botEts,Key) , % if its not there -> ignore
 printLookUp(LookUp),  lookup(T);
 lookup(_)-> error.
 
 printLookUp([])->ok;
-printLookUp([Key,Value|T]) -> io:format("key: ~p val: ~p ~n",[Key,Value]), printLookUp(T).
+printLookUp([{Key,Value}|T]) -> io:format("key: ~p val: ~p ~n",[Key,Value]), printLookUp(T).
